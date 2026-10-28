@@ -1,0 +1,308 @@
+
+ // Company             : tud
+ // Author              : naah767f
+ // E-Mail              : <email>
+ //
+ // Filename            : alu_control.v
+ // Project Name        : prz
+ // Subproject Name     : risc_core
+ // Description         : <short description>
+ //
+ // Create Date         : Fri Sep 11 10:03:41 2026
+ // Last Change         : $Date$
+ // by                  : $Author$
+ //-------------------------------------------------------------------
+
+//Fill in testcase specific pattern generation
+initial begin
+    // ALU class OP: RV64 register-register operations
+    alu_class = ALU_CLASS_OP;
+
+    //ADD
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b0, "ADD");
+
+    //SUB
+    funct3 = 3'b000;
+    funct7 = 7'b0100000;
+    check(ALU_SUB, 1'b0, "SUB");
+
+    //SLL
+    //ADD
+    funct3 = 3'b001;
+    funct7 = 7'b0000000;
+    check(ALU_SLL, 1'b0, "SLL");
+
+    //SLTU
+    //ADD
+    funct3 = 3'b011;
+    funct7 = 7'b0000000;
+    check(ALU_SLTU, 1'b0, "SLTU");
+
+    //XOR
+    funct3 = 3'b100;
+    funct7 = 7'b0000000;
+    check(ALU_XOR, 1'b0, "XOR");
+
+    //SRL
+    funct3 = 3'b101;
+    funct7 = 7'b0000000;
+    check(ALU_SRL, 1'b0, "SRL");
+
+    //SRA
+    funct3 = 3'b101;
+    funct7 = 7'b0100000;
+    check(ALU_SRA, 1'b0, "SRA");
+
+    //OR
+    funct3 = 3'b110;
+    funct7 = 7'b0000000;
+    check(ALU_OR, 1'b0, "OR");
+
+    //AND
+    funct3 = 3'b111;
+    funct7 = 7'b0000000;
+    check(ALU_AND, 1'b0, "AND");
+
+    //ALU_CLASS_OP_IMM: immediate operations
+    alu_class = ALU_CLASS_OP_IMM;
+
+    //ADDI
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b0, "ADDI");
+
+    //SLTI
+    funct3 = 3'b010;
+    funct7 = 7'b0000000;
+    check(ALU_SLT, 1'b0, "SLTI");
+
+    //SLTIU
+    funct3 = 3'b011;
+    funct7 = 7'b0000000;
+    check(ALU_SLTU, 1'b0, "SLTIU");
+
+    //XORI
+    funct3 = 3'b100;
+    funct7 = 7'b0000000;
+    check(ALU_XOR, 1'b0, "XORI");
+
+    //ORI
+    funct3 = 3'b110;
+    funct7 = 7'b0000000;
+    check(ALU_OR, 1'b0, "ORI");
+
+    //ANDI
+    funct3 = 3'b111;
+    funct7 = 7'b0000000;
+    check(ALU_AND, 1'b0, "ANDI");
+
+    //SLLI
+    funct3 = 3'b001;
+    funct7 = 7'b0000000;
+    check(ALU_SLL, 1'b0, "SLLI");
+
+    //SLLI with shamt[5] =1
+    //funct7[0] is ignored for RV64 SLLI
+
+    funct3 = 3'b001;
+    funct7 = 7'b0000001;
+    check(ALU_SLL, 1'b0, "SLLI shamt bit5");
+
+    //SRLI
+    funct3 = 3'b101;
+    funct7 = 7'b0000000;
+    check(ALU_SRL, 1'b0, "SRLI");
+
+    //SRLI with shamt[5] = 1
+    funct3 = 3'b101;
+    funct7 = 7'b0000001;
+    check(ALU_SRL, 1'b0, "SRLI shamt bit5");
+
+    //SRAI
+    funct3 = 3'b101;
+    funct7 = 7'b0100000;
+    check(ALU_SRA, 1'b0, "SRAI");
+
+    //SRAI with shamt[5] = 1
+    funct3 = 3'b101;
+    funct7 = 7'b0100001;
+    check(ALU_SRA, 1'b0, "SRAI shamt bit5");
+
+    //ALU_CLASS_OP_32 : RV64 word register register
+
+    alu_class = ALU_CLASS_OP_32;
+
+    //ADDW
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADDW, 1'b0, "ADDW");
+
+    //SUBW
+    funct3 = 3'b000;
+    funct7 = 7'b0100000;
+    check(ALU_SUBW, 1'b0, "SUBW");
+
+    //SLLW
+    funct3 = 3'b001;
+    funct7 = 7'b0000000;
+    check(ALU_SLLW, 1'b0, "SLLW");
+
+    //SRLW
+    funct3 = 3'b101;
+    funct7 = 7'b0000000;
+    check(ALU_SRLW, 1'b0, "SRLW");
+
+    //SRAW
+    funct3 = 3'b101;
+    funct7 = 7'b0100000;
+    check(ALU_SRAW, 1'b0, "SRAW");
+
+    //ALU_CLASS_IMM_32 : RV64 immediate word operations
+
+    alu_class = ALU_CLASS_OP_IMM_32;
+
+    //ADDIW
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADDW, 1'b0, "ADDIW");
+
+    //SUBW
+
+    funct3 = 3'b001;
+    funct7 = 7'b0000000;
+    check(ALU_SLLW, 1'b0, "SLLIW");
+
+    //SRLIW
+    funct3 = 3'b101;
+    funct7 = 7'b0000000;
+    check(ALU_SRLW, 1'b0, "SRLIW");
+
+    //SRAIW
+    funct3 = 3'b101;
+    funct7 = 7'b0100000;
+    check(ALU_SRAW, 1'b0, "SRAIW");
+
+    //ALU_CLASS_ADD
+    alu_class = ALU_CLASS_ADD;
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b0, "ADD class normal");
+
+    //Garbage funct fields must still produce ADD
+    alu_class = ALU_CLASS_ADD;
+    funct3 = 3'b111;
+    funct7 = 7'b1111111;
+    check(ALU_ADD, 1'b0, "ADD class ignores funct fields");
+
+
+    //Illegal tests
+    //Invalid funct7 for ADD/SUB position
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b000;
+    funct7 = 7'b1111111;
+    check(ALU_ADD, 1'b1, "illegal OP funct7");
+
+    //MUL encoding entering normal ALU controller
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b000;
+    funct7 = 7'b0000001;
+    check(ALU_ADD, 1'b1, "M extension sent to ALU");
+
+    //Invalid SLL
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b001;
+    funct7 = 7'b0100000;
+    check(ALU_ADD, 1'b1, "illegal SLL funct7");
+
+    //Invalid SLT
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b010;
+    funct7 = 7'b0100000;
+    check(ALU_ADD, 1'b1, "illegal SLT funct7");
+
+    //Invalid XOR
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b100;
+    funct7 = 7'b0100000;
+    check(ALU_ADD, 1'b1, "illegal XOR funct7");
+
+    //Invalid OR
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b110;
+    funct7 = 7'b0100000;
+    check(ALU_ADD, 1'b1, "illegal OR funct7");
+
+    //Invalid AND
+    alu_class = ALU_CLASS_OP;
+    funct3 = 3'b111;
+    funct7 = 7'b0100000;
+    check(ALU_ADD, 1'b1, "illegal AND funct7");
+
+
+    //Invalid immediate shift encodings
+
+    alu_class = ALU_CLASS_OP_IMM;
+    funct3 = 3'b001;
+    funct7 = 7'b0010000;
+    check(ALU_ADD, 1'b1, "illegal SLLI funct6");
+
+    //Invalid AND
+    alu_class = ALU_CLASS_OP_IMM;
+    funct3 = 3'b101;
+    funct7 = 7'b0010000;
+    check(ALU_ADD, 1'b1, "illegal SRLI funct6");
+
+
+    // Invalid OP-32 combinations
+
+    //MULW like encoding must be rejected
+
+    alu_class = ALU_CLASS_OP_32;
+    funct3 = 3'b000;
+    funct7 = 7'b0000001;
+    check(ALU_ADD, 1'b1, "MULW encoding rejected");
+
+    //funct3 010 does not exist for OP-32
+    alu_class = ALU_CLASS_OP_32;
+    funct3 = 3'b010;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b1, "invalid OP32 funct3");
+
+
+    //Invalid OP-IMM-32 combinations
+    //SLLIW requires full funct7 = 0000000
+    alu_class = ALU_CLASS_OP_IMM_32;
+    funct3 = 3'b001;
+    funct7 = 7'b0000001;
+    check(ALU_ADD, 1'b1, "illegal SLLIW funct7");
+
+    //Invalid SRLIW/SRAIW encoding
+    alu_class = ALU_CLASS_OP_IMM_32;
+    funct3 = 3'b101;
+    funct7 = 7'b0010000;
+    check(ALU_ADD, 1'b1, "illegal SRLIW SRAIW funct7");
+
+    //unsupported funct3 for OP-IMM 32
+    alu_class = ALU_CLASS_OP_IMM_32;
+    funct3 = 3'b010;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b1, "invalid OPIMM32 funct3");
+
+
+    //Unsupported ALU_class
+    alu_class= 3'd7;
+    funct3 = 3'b000;
+    funct7 = 7'b0000000;
+    check(ALU_ADD, 1'b1, "unsupported ALU class");
+
+
+    //SUmmary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
