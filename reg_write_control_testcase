@@ -1,0 +1,344 @@
+
+initial begin
+    //init
+    set_defaults;
+    #1;
+
+    //Test1: Valid completed ADD
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "ADD completed rd=x5");
+
+
+    //Test2: Valid completed ADDI
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd3;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "ADDI completed rd=x3");
+
+
+    //Test3: Valid completed LUI
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "LUI completed rd=x5");
+
+
+    //Test4: Valid completed AUIPC
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd6;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "AUIPC completed rd=x6");
+
+
+    //Test5: Load still waiting
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b0;
+
+    run_check(1'b0, "Load waiting commit=0");
+
+
+    //Test6: Load completed
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "Load completed commit=1");
+
+
+    //Test7: DIV still busy
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd7;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b0;
+
+    run_check(1'b0, "DIV busy commit=0");
+
+
+    //Test8: DIV completed
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd7;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "DIV completed commit=1");
+
+
+    //Test9: Store instruction
+    set_defaults;
+    decoded_reg_write = 1'b0;
+    rd_addr = 5'd9;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "Store no register write");
+
+
+    //Test10: Branch instruction
+    set_defaults;
+    decoded_reg_write = 1'b0;
+
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "Branch no register write");
+
+
+    //Test11: JAL with rd=x1
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd1;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "JAL rd=x1 write enabled");
+
+
+    //Test12: JAL with rd=x0
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd0;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "JAL rd=x0 write disabled");
+
+
+    //Test13: CSR instruction with rd=x5
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "CSRRW rd=x5 write enabled");
+
+
+    //Test14: CSR instruction with rd=x0
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd0;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "CSRRW rd=x0 write disabled");
+
+
+    //Test15: MRET instruction
+    set_defaults;
+    decoded_reg_write = 1'b0;
+
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "MRET no register write");
+
+
+    //Test16: WFI instruction
+    set_defaults;
+    decoded_reg_write = 1'b0;
+
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "WFI no register write");
+
+
+    //Test17: Illegal instruction
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    illegal_instr = 1'b1;
+
+    run_check(1'b0, "Illegal instruction write disabled");
+
+
+    //Test18: Synchronous exception
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    exception_pending = 1'b1;
+
+    run_check(1'b0, "exception_pending write disabled");
+
+
+    //Test19: Instruction not valid
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b0;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "Invalid instruction write disabled");
+
+
+    //Test20: Instruction not committed
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b0;
+
+    run_check(1'b0, "Uncommitted instruction write disabled");
+
+
+    //Test21: Flushed instruction
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    flush = 1'b1;
+
+    run_check(1'b0, "Flushed instruction write disabled");
+
+
+    //Test22: Completed instruction with interrupt pending
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd8;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    exception_pending = 1'b0;
+
+    run_check(1'b1, "Completed instruction write allowed");
+
+
+    //Test23: Completed instruction with interrupt pending
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd10;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "Consecutive write rd=x10");
+
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd11;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "Consecutive write rd=x11");
+
+
+    //Test24: Completed instruction with interrupt pending
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd12;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b0;
+
+    run_check(1'b0, "No commit no register write");
+
+
+    //Test25: Maximum register address x31
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd31;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "Maximum register x31 write enabled");
+
+
+    //Test26: x0 protections with all conditions valid
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd0;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+
+    run_check(1'b0, "x0 protection");
+
+
+    //Test27: Exception and flush simultaneously
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    exception_pending = 1'b1;
+    flush = 1'b1;
+
+    run_check(1'b0, "Exception and flush suppress write");
+
+
+    //Test28: Illegal instruction and exception
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b1;
+    illegal_instr = 1'b1;
+    exception_pending = 1'b1;
+
+    run_check(1'b0, "Illegal instruction and exception");
+
+
+    //Test29: All blocking conditions asserted
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd5;
+    instruction_valid = 1'b0;
+    instruction_commit = 1'b0;
+    illegal_instr = 1'b1;
+    exception_pending = 1'b1;
+    flush = 1'b1;
+
+    run_check(1'b0, "All blocking conditions active");
+
+
+    //Test30: combinational update
+    set_defaults;
+    decoded_reg_write = 1'b1;
+    rd_addr = 5'd15;
+    instruction_valid = 1'b1;
+    instruction_commit = 1'b0;
+
+    run_check(1'b0, "Before commit write disabled");
+
+    instruction_commit = 1'b1;
+
+    run_check(1'b1, "After commit write enabled");
+
+    flush = 1'b1;
+
+    run_check(1'b0, "After flush write disabled");
+
+    flush = 1'b0;
+
+    run_check(1'b1, "After flush cleared write enabled");
+
+
+    if (failed_tests == 0)
+        $display("*** ALL REG_WRITE_CONTROL TESTS PASSED ***");
+    else
+        $display("*** %0d REG_WRITE_CONTROL TEST(S) FAILED ***", failed_tests);
+
+    $finish();
+end
