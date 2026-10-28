@@ -1,0 +1,83 @@
+
+`timescale 1ns/10ps
+
+module tb_muldiv64 ();
+
+    reg clk;
+    reg a_reset_l;
+
+    reg [63:0] operand_a, operand_b;
+    reg [3:0] md_op;
+    wire [63:0] result;
+
+    localparam MD_MUL    = 4'd0;
+    localparam MD_MULH   = 4'd1;
+    localparam MD_MULHSU = 4'd2;
+    localparam MD_MULHU  = 4'd3;
+    localparam MD_DIV    = 4'd4;
+    localparam MD_DIVU   = 4'd5;
+    localparam MD_REM    = 4'd6;
+    localparam MD_REMU   = 4'd7;
+    localparam MD_MULW   = 4'd8;
+    localparam MD_DIVW   = 4'd9;
+    localparam MD_DIVUW  = 4'd10;
+    localparam MD_REMW   = 4'd11;
+    localparam MD_REMUW  = 4'd12;
+
+    integer errors = 0;
+
+    // Device Under Test
+    muldiv64 muldiv64_i (
+        .operand_a (operand_a),
+        .operand_b (operand_b),
+        .md_op     (md_op),
+        .result    (result)
+    );
+
+    // Check result
+    task check_result;
+        input [63:0] expected;
+        input [127:0] msg;
+        begin
+            #1;
+            if (result !== expected) begin
+                $display(
+                    "FAIL %0s: a=0x%016h b=0x%016h expected=0x%016h got=0x%016h",
+                    msg, operand_a, operand_b, expected, result
+                );
+                errors = errors + 1;
+            end
+            else begin
+                $display(
+                    "PASS %0s: result=0x%016h",
+                    msg, result
+                );
+            end
+        end
+    endtask
+
+    ////////////////////////////////////////////////////
+    //// Template for clk and reset generation     ////
+    //// Uncomment it when needed                  ////
+    ////////////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    // initial begin
+    //     a_reset_l = 1'b0;
+    //     #33;
+    //     a_reset_l = 1'b1;
+    // end
+
+    ////////////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File must be situated in:
+    // simulation/<simulator_name>/[testcase] directory
+
+    `include "testcase.v"
+
+endmodule
