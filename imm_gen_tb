@@ -1,0 +1,108 @@
+
+`timescale 1ns/10ps
+
+module tb_imm_gen;
+
+    reg [31:0] instr;
+    reg [2:0] imm_sel;
+    wire [63:0] imm;
+
+    localparam IMM_I = 3'b000;
+    localparam IMM_S = 3'b001;
+    localparam IMM_B = 3'b010;
+    localparam IMM_U = 3'b011;
+    localparam IMM_J = 3'b100;
+
+    integer errors = 0;
+
+    imm_gen dut (
+        .instr(instr),
+        .imm_sel(imm_sel),
+        .imm(imm)
+    );
+
+    task check_imm;
+        input [63:0] expected;
+        input [127:0] msg;
+        begin
+            #1;
+            if (imm !== expected) begin
+                $display("FAIL %0s: instr=0x%08h expected=0x%016h got=0x%016h",
+                         msg, instr, expected, imm);
+                errors = errors + 1;
+            end else begin
+                $display("PASS %0s: instr=0x%08h imm=0x%016h",
+                         msg, instr, imm);
+            end
+        end
+    endtask
+
+    initial begin
+
+        // I type: addi x1, x2, 5 (positive immediate =5)
+        // imm[31:20]=12'h005
+        instr = {12'h005, 5'd2, 3'b000, 5'd1, 7'b0010011};
+        imm_sel = IMM_I;
+        check_imm(64'h0000000000000005, "I type positive (addi x1,x2,5)");
+
+        // I type: addi x1, x2, -1 (negative immediate =-1=12'hFFF)
+        instr = {12'hFFF, 5'd2, 3'b000, 5'd1, 7'b0010011};
+        imm_sel = IMM_I;
+        check_imm(64'hFFFFFFFFFFFFFFFF, "I type negative (addi x1,x2,-1)");
+
+        // S type: sd x3, 20(x4) (positive offset =20=12'h014)
+        // imm[11:5]=instr[31:25], imm[4:0]=instr[11:7]
+        instr = {7'b0000000, 5'd3, 5'd4, 3'b011, 5'b10100, 7'b0100011};
+        imm_sel = IMM_S;
+        check_imm(64'h0000000000000014, "S type positive (sd x3,20(x4))");
+
+        // S type: sd x3, -8(x4) (negative offset =-8=12'hFF8)
+        // -8= 12'b1111_1111_1000 -> [11:5]=1111111 [4:0]=11000
+        instr = {7'b1111111, 5'd3, 5'd4, 3'b011, 5'b11000, 7'b0100011};
+        imm_sel = IMM_S;
+        check_imm(64'hFFFFFFFFFFFFFFF8, "S type negative (sd x3,-8(x4))");
+
+        // B type: beq +16
+        instr = {1'b0, 6'b000000, 5'd2, 5'd1,
+                 3'b000, 4'b1000, 1'b0, 7'b1100011};
+        imm_sel = IMM_B;
+        check_imm(64'h0000000000000010, "B-type positive (beq +16)");
+
+        // B type: bne -16
+        instr = {1'b1, 6'b111111, 5'd2, 5'd1,
+                 3'b001, 4'b1000, 1'b1, 7'b1100011};
+        imm_sel = IMM_B;
+        check_imm(64'hFFFFFFFFFFFFFFF0, "B-type negative (bne -16)");
+
+        // U type: lui x5, 0x12345
+        instr = {20'h12345, 5'd5, 7'b0110111};
+        imm_sel = IMM_U;
+        check_imm(64'h0000000012345000, "U type (lui x5, 0x12345)");
+
+        // U type negative: lui x5, 0x80000
+        instr = {20'h80000, 5'd5, 7'b0110111};
+        imm_sel = IMM_U;
+        check_imm(64'hFFFFFFFF80000000, "U type negative (lui x5, 0x80000)");
+
+        // J type: jal +2048
+        instr = {1'b0, 10'b1000000000, 1'b0,
+                 8'b00000000, 5'd1, 7'b1101111};
+        imm_sel = IMM_J;
+        check_imm(64'h0000000000000800, "J-type positive (jal +2048)");
+
+        // J type: jal -2048
+        instr = {1'b1, 10'b1000000000, 1'b1,
+                 8'b11111111, 5'd1, 7'b1101111};
+        imm_sel = IMM_J;
+        check_imm(64'hFFFFFFFFFFFFF800, "J-type negative (jal -2048)");
+
+        // summary
+        if (errors == 0)
+            $display("\n*** ALL TESTS PASSED ***\n");
+        else
+            $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+        $finish;
+    end
+
+endmodule
