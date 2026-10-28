@@ -1,0 +1,135 @@
+
+//////////////////////////////////////////////////////////////////////
+// Company           : tud
+// Author            : naah767f
+// E-Mail            : <email>
+//
+// Filename          : alu.v
+// Project Name      : prz
+// Subproject Name   : risc_core
+// Description       : <short description>
+//
+// Create Date       : Wed Sep 2 09:34:50 2026
+// Last Change       : $Date$
+// by                : $Author$
+//////////////////////////////////////////////////////////////////////
+
+//Fill in testcase specific pattern generation
+initial begin
+
+    //ADD
+    operand_a = 64'd5;
+    operand_b = 64'd7;
+    alu_op = ALU_ADD;
+    check_result(64'd12, "ADD 5+7");
+
+    //SUB
+    operand_a = 64'd10;
+    operand_b = 64'd3;
+    alu_op = ALU_SUB;
+    check_result(64'd7, "ADD 10-3");
+
+    //AND/XOR/OR
+    operand_a = 64'h00000000000000F0;
+    operand_b = 64'h000000000000000F;
+
+    alu_op = ALU_AND;
+    check_result(64'h0000000000000000, "AND 0xF0 & 0x0F");
+
+    alu_op = ALU_OR;
+    check_result(64'h00000000000000FF, "OR 0xF0 | 0x0F");
+
+    alu_op = ALU_XOR;
+    check_result(64'h00000000000000FF, "XOR 0xF0 ^ 0x0F");
+
+    //SLL - logical left shift
+    operand_a = 64'd1;
+    operand_b = 64'd4;
+    alu_op = ALU_SLL;
+    check_result(64'd16, "SLL 1<<4");
+
+    //SRL - logical right shift
+    operand_a = 64'h0000000000000080;
+    operand_b = 64'd3;
+    alu_op = ALU_SRL;
+    check_result(64'd16, "SRL 0x80>>3");
+
+    //SRA - arithmetic right shift
+    operand_a = 64'hFFFFFFFFFFFFFFF0;
+    operand_b = 64'd2;
+    alu_op = ALU_SRA;
+    check_result(64'hFFFFFFFFFFFFFFFC, "SRA -16>>2 =-4");
+
+    //SLT-signed comparison
+    operand_a = 64'hFFFFFFFFFFFFFFFF;
+    operand_b = 64'h0000000000000001;
+    alu_op = ALU_SLT;
+    check_result(64'd1, "SRA -1<1 signed");
+
+    //signed false care
+    operand_a = 64'h0000000000000001;
+    operand_b = 64'hFFFFFFFFFFFFFFFF;
+    alu_op = ALU_SLT;
+    check_result(64'd0, "SRA 1<-1 signed false");
+
+    //SLTU unsigned comparison
+    operand_a = 64'hFFFFFFFFFFFFFFFF;
+    operand_b = 64'h0000000000000001;
+    alu_op = ALU_SLTU;
+    check_result(64'd0, "SLTU max unsigned < 1 false");
+
+    operand_a = 64'h0000000000000001;
+    operand_b = 64'hFFFFFFFFFFFFFFFF;
+    alu_op = ALU_SLTU;
+    check_result(64'd1, "SLTU 1 < max unsigned");
+
+    //64bit shift amount uses only operand_b
+    operand_a = 64'd1;
+    operand_b = 64'd68;
+    alu_op = ALU_SLL;
+    check_result(64'd16, "SLL shift 68 uses low 6 bits =4");
+
+    //ADDW
+    operand_a = 64'h000000007FFFFFFF;
+    operand_b = 64'h0000000000000001;
+    alu_op = ALU_ADDW;
+    check_result(64'hFFFFFFFF80000000, "ADDW overflow to negative word");
+
+    //SUBW
+    operand_a = 64'd0;
+    operand_b = 64'd1;
+    alu_op = ALU_SUBW;
+    check_result(64'hFFFFFFFFFFFFFFFF, "SUBW 0-1 = -1 sign extended");
+
+    //SLLW
+    operand_a = 64'h0000000000000001;
+    operand_b = 64'd31;
+    alu_op = ALU_SLLW;
+    check_result(64'hFFFFFFFF80000000, "SLLW 1<<31 sign extended");
+
+    //SRLW
+    operand_a = 64'h0000000080000000;
+    operand_b = 64'd4;
+    alu_op = ALU_SRLW;
+    check_result(64'h0000000008000000, "SRLW logical shift positive result");
+
+    //SRAW
+    operand_a = 64'h0000000080000000;
+    operand_b = 64'd4;
+    alu_op = ALU_SRAW;
+    check_result(64'hFFFFFFFFF8000000, "SRAW arithmetic shift negative word");
+
+    //word shifts use only operand_b [4:0]
+    operand_a = 64'h0000000000000001;
+    operand_b = 64'd36;
+    alu_op = ALU_SLLW;
+    check_result(64'd16, "SLLW shift 36 uses low 5 bits =4");
+
+    //Summary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
