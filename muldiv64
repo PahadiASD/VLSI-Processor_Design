@@ -1,0 +1,181 @@
+
+`timescale 1ns/10ps
+
+module muldiv64 (
+    input wire [63:0] operand_a,
+    input wire [63:0] operand_b,
+    input wire [3:0] md_op,
+
+    output reg [63:0] result
+);
+
+    // md op encoding
+    localparam MD_MUL    = 4'd0;
+    localparam MD_MULH   = 4'd1;
+    localparam MD_MULHSU = 4'd2;
+    localparam MD_MULHU  = 4'd3;
+    localparam MD_DIV    = 4'd4;
+    localparam MD_DIVU   = 4'd5;
+    localparam MD_REM    = 4'd6;
+    localparam MD_REMU   = 4'd7;
+    localparam MD_MULW   = 4'd8;
+    localparam MD_DIVW   = 4'd9;
+    localparam MD_DIVUW  = 4'd10;
+    localparam MD_REMW   = 4'd11;
+    localparam MD_REMUW  = 4'd12;
+
+    // 64 bit multiply helpers
+    // unsigned 128 bit product: both operands unsigned, context width 128
+    // zero extends them before multiplying -> correct for MUL and MULHU
+
+    wire [127:0] unsigned_product = operand_a * operand_b;
+
+    // signed 128 bit product: both operands cast signed, context width 128
+    // sign extends them before multiplying -> correct for MULH
+
+    wire signed [127:0] signed_product =
+        $signed(operand_a) * $signed(operand_b);
+
+    // MULHSU
+    wire signed [64:0] mulhsu_a = {operand_a[63], operand_a};
+    wire signed [64:0] mulhsu_b = {1'b0, operand_b};
+    wire signed [129:0] mulhsu_product = mulhsu_a * mulhsu_b;
+
+    // 64 bit divide/remainder helpers
+    wire signed [63:0] operand_a_s = operand_a;
+    wire signed [63:0] operand_b_s = operand_b;
+
+    localparam signed [63:0] INT64_MIN = 64'h8000000000000000;
+    localparam signed [63:0] NEG_ONE_64 = 64'hFFFFFFFFFFFFFFFF;
+
+    wire div64_by_zero = (operand_b == 64'h0);
+    wire div64_overflow =
+        (operand_a_s == INT64_MIN) && (operand_b_s == NEG_ONE_64);
+
+    // 32 bit word multiply helper
+    wire [63:0] product32 = operand_a[31:0] * operand_b[31:0];
+
+    // 32 bit word divide/remainder helpers
+    wire signed [31:0] operand_a_w_s = operand_a[31:0];
+    wire signed [31:0] operand_b_w_s = operand_b[31:0];
+    wire [31:0] operand_a_w_u = operand_a[31:0];
+    wire [31:0] operand_b_w_u = operand_b[31:0];
+
+    localparam signed [31:0] INT32_MIN = 32'h80000000;
+    localparam signed [31:0] NEG_ONE_32 = 32'hFFFFFFFF;
+
+    wire div32_by_zero = (operand_b[31:0] == 32'h0);
+    wire div32_overflow =
+        (operand_a_w_s == INT32_MIN) && (operand_b_w_s == NEG_ONE_32);
+
+    // result mux
+    always @* begin
+        result = 64'h0;
+
+        case (md_op)
+
+            // 64 bit multiply
+            MD_MUL:    result = unsigned_product[63:0];
+            MD_MULH:   result = signed_product[127:64];
+            MD_MULHU:  result = unsigned_product[127:64];
+            MD_MULHSU: result = mulhsu_product[127:64];
+
+            // 64 bit divide
+            MD_DIV: begin
+                if (div64_by_zero)
+                    result = 64'hFFFFFFFFFFFFFFFF;
+                else if (div64_overflow)
+                    result = INT64_MIN;
+                else
+                    result = operand_a_s / operand_b_s;
+            end
+
+            MD_DIVU: begin
+                if (div64_by_zero)
+                    result = 64'hFFFFFFFFFFFFFFFF;
+                else
+                    result = operand_a / operand_b;
+            end
+
+            // 64 bit remainder
+            MD_REM: begin
+                if (div64_by_zero)
+                    result = operand_a;
+                else if (div64_overflow)
+                    result = 64'h0;
+                else
+                    result = operand_a_s % operand_b_s;
+            end
+
+            MD_REMU: begin
+                if (div64_by_zero)
+                    result = operand_a;
+                else if (div64_overflow)
+                    result = operand_a;
+                else
+                    result = operand_a % operand_b;
+            end
+
+            // RV64 word multiply
+            MD_MULW:
+                result = {{32{product32[31]}}, product32[31:0]};
+
+            // RV64 word divide
+            MD_DIVW: begin : divw_blk
+                reg signed [31:0] q32;
+
+                if (div32_by_zero)
+                    result = 64'hFFFFFFFFFFFFFFFF;
+                else if (div32_overflow)
+                    result = {{32{INT32_MIN[31]}}, INT32_MIN};
+                else begin
+                    q32 = operand_a_w_s / operand_b_w_s;
+                    result = {{32{q32[31]}}, q32};
+                end
+            end
+
+            MD_DIVUW: begin : divuw_blk
+                reg [31:0] qu32;
+
+                if (div32_by_zero)
+                    result = 64'hFFFFFFFFFFFFFFFF;
+                else begin
+                    qu32 = operand_a_w_u / operand_b_w_u;
+                    result = {{32{qu32[31]}}, qu32};
+                end
+            end
+
+            // RV64 word remainder
+            MD_REMW: begin : remw_blk
+                reg signed [31:0] r32;
+
+                if (div32_by_zero)
+                    result = {{32{operand_a[31]}}, operand_a[31:0]};
+                else if (div32_overflow)
+                    result = 64'h0;
+                else begin
+                    r32 = operand_a_w_s % operand_b_w_s;
+                    result = {{32{r32[31]}}, r32};
+                end
+            end
+
+            // RV64 word remainder
+            MD_REMUW: begin : remuw_blk
+                reg [31:0] ru32;
+
+                if (div32_by_zero)
+                    result = {{32{operand_a[31]}}, operand_a[31:0]};
+                else if (div32_overflow)
+                    result = 64'h0;
+                else begin
+                    ru32 = operand_a_w_u % operand_b_w_u;
+                    result = {{32{ru32[31]}}, ru32};
+                end
+            end
+
+            default: result = 64'h0;
+
+        endcase
+    end
+
+endmodule
