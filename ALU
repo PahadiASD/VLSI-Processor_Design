@@ -1,0 +1,99 @@
+
+`timescale 1ns/10ps
+
+module alu (
+    input wire [63:0] operand_a,
+    input wire [63:0] operand_b,
+    input wire [4:0] alu_op,
+
+    output reg [63:0] result
+);
+
+    // alu op encoding
+    localparam ALU_ADD  = 5'd0;
+    localparam ALU_SUB  = 5'd1;
+    localparam ALU_AND  = 5'd2;
+    localparam ALU_OR   = 5'd3;
+    localparam ALU_XOR  = 5'd4;
+    localparam ALU_SLL  = 5'd5;
+    localparam ALU_SRL  = 5'd6;
+    localparam ALU_SRA  = 5'd7;
+    localparam ALU_SLT  = 5'd8;
+    localparam ALU_SLTU = 5'd9;
+
+    localparam ALU_ADDW = 5'd10;
+    localparam ALU_SUBW = 5'd11;
+    localparam ALU_SLLW = 5'd12;
+    localparam ALU_SRLW = 5'd13;
+    localparam ALU_SRAW = 5'd14;
+
+    // signed views of the 64 bit operands, used for SLT/SRA
+    wire signed [63:0] operand_a_signed = operand_a;
+    wire signed [63:0] operand_b_signed = operand_b;
+
+    // signed views of the lower 32 bits, used for SRAW
+    wire signed [31:0] operand_a_w_signed = operand_a[31:0];
+
+    // 32 bit word result before sign extension, computed per op below
+    reg [31:0] result_w;
+
+    always @* begin
+        // default assignments prevent inferred latches on any path
+        result = 64'h0;
+        result_w = 32'h0;
+
+        case (alu_op)
+
+            // Base RV64I arithmetic/logical
+
+            ALU_ADD: result = operand_a + operand_b;
+            ALU_SUB: result = operand_a - operand_b;
+            ALU_AND: result = operand_a & operand_b;
+            ALU_OR:  result = operand_a | operand_b;
+            ALU_XOR: result = operand_a ^ operand_b;
+
+            // base RV64I shifts - lower 6 bits of operand_b select shift amount
+            ALU_SLL: result = operand_a << operand_b[5:0];
+            ALU_SRL: result = operand_a >> operand_b[5:0];
+            ALU_SRA: result = operand_a_signed >>> operand_b[5:0];
+
+            // base RV64I comparisons
+            ALU_SLT:  result = (operand_a_signed < operand_b_signed) ? 64'd1 : 64'd0;
+            ALU_SLTU: result = (operand_a < operand_b) ? 64'd1 : 64'd0;
+
+            // RV64I word ("W") ops - operate on lower 32 bits,
+            // lower 5 bits of operand_b select shift amount,
+            // result is sign extended back to 64 bits.
+            ALU_ADDW: begin
+                result_w = operand_a[31:0] + operand_b[31:0];
+                result = {{32{result_w[31]}}, result_w};
+            end
+
+            ALU_SUBW: begin
+                result_w = operand_a[31:0] - operand_b[31:0];
+                result = {{32{result_w[31]}}, result_w};
+            end
+
+            ALU_SLLW: begin
+                result_w = operand_a[31:0] << operand_b[4:0];
+                result = {{32{result_w[31]}}, result_w};
+            end
+
+            ALU_SRLW: begin
+                result_w = operand_a[31:0] >> operand_b[4:0];
+                result = {{32{result_w[31]}}, result_w};
+            end
+
+            ALU_SRAW: begin
+                result_w = operand_a_w_signed >>> operand_b[4:0];
+                result = {{32{result_w[31]}}, result_w};
+            end
+
+            default: begin
+                result = 64'h0;
+            end
+
+        endcase
+    end
+
+endmodule
