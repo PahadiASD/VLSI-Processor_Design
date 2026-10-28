@@ -1,0 +1,46 @@
+// Company          : tud
+// Author           : naah767f
+// E-Mail           : <email>
+//
+// Filename         : reg_write_control.v
+// Project Name     : prz
+// Subproject Name  : risc_core
+// Description      : <short description>
+//
+// Create Date      : Sat Oct 10 13:52:30 2026
+// Last Change      : $Date$
+// by               : $Author$
+//------------------------------------------------------------------
+`timescale 1ns/10ps
+
+module reg_write_control (
+    //From instruction decoder
+    input wire decoded_reg_write,
+    input wire [4:0] rd_addr,
+
+    //From the execution FSM
+    input wire instruction_valid,
+    input wire instruction_commit,
+
+    //from the decoder/ALU Control/ CSR control/ memory control, aggregated by the execution FSM
+    input wire illegal_instr,
+    input wire exception_pending,
+
+    //reserved for a future pipelined implementation
+    input wire flush,
+    output reg final_reg_write_en
+
+);
+
+    always @* begin
+        final_reg_write_en =
+            decoded_reg_write &&
+            instruction_valid &&
+            instruction_commit &&
+            !illegal_instr &&
+            !exception_pending &&
+            !flush &&
+            (rd_addr != 5'd0);
+    end
+
+endmodule
