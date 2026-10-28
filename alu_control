@@ -1,0 +1,190 @@
+
+`timescale 1ns/10ps
+
+module alu_control (
+    input wire [2:0] alu_class,
+    input wire [2:0] funct3,
+    input wire [6:0] funct7,
+
+    output reg [4:0] alu_op,
+    output reg alu_illegal
+);
+
+    //alu class encoding
+
+    localparam ALU_CLASS_ADD = 3'd0; //address calc, AUIPC, LUI, JAL/JALR target
+    localparam ALU_CLASS_OP = 3'd1; // R type register-register
+    localparam ALU_CLASS_OP_IMM = 3'd2; // I type immediate ALU ops
+    localparam ALU_CLASS_OP_32 = 3'd3; //R type "W"register-register word ops
+    localparam ALU_CLASS_OP_IMM_32 = 3'd4; // I type "W" immediate word ops
+
+    //alu op encoding
+    localparam ALU_ADD = 5'd0;
+    localparam ALU_SUB = 5'd1;
+    localparam ALU_AND = 5'd2;
+    localparam ALU_OR = 5'd3;
+    localparam ALU_XOR = 5'd4;
+    localparam ALU_SLL = 5'd5;
+    localparam ALU_SRL = 5'd6;
+    localparam ALU_SRA = 5'd7;
+    localparam ALU_SLT = 5'd8;
+    localparam ALU_SLTU = 5'd9;
+    localparam ALU_ADDW = 5'd10;
+    localparam ALU_SUBW = 5'd11;
+    localparam ALU_SLLW = 5'd12;
+    localparam ALU_SRLW = 5'd13;
+    localparam ALU_SRAW = 5'd14;
+
+    wire [5:0] funct6 = funct7[6:1];
+
+    always @* begin
+        // safe defaults -- avoid inferred latches on every path
+        alu_op = ALU_ADD;
+        alu_illegal = 1'b0;
+
+        case (alu_class)
+            //pure address/offset addition -- no funct decoding needed
+            ALU_CLASS_ADD: begin
+                alu_op = ALU_ADD;
+            end
+
+            //RV64I register-register ALU operations
+            ALU_CLASS_OP: begin
+                case(funct3)
+                    3'b000: begin //ADD/SUB
+                        if(funct7 == 7'b0000000) alu_op=ALU_ADD;
+                        else if(funct7 == 7'b0100000) alu_op=ALU_SUB;
+                        else begin
+                            alu_illegal= 1'b1;
+                        end
+                    end
+
+                    3'b001: begin //SLL
+                        if(funct7 == 7'b0000000) alu_op=ALU_SLL;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b010: begin //SLT
+                        if(funct7 == 7'b0000000) alu_op=ALU_SLT;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b011: begin //SLTU
+                        if(funct7 == 7'b0000000) alu_op=ALU_SLTU;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b100: begin //XOR
+                        if(funct7 == 7'b0000000) alu_op=ALU_XOR;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b101: begin //SRL/SRA
+                        if(funct7 == 7'b0000000) alu_op=ALU_SRL;
+                        else if(funct7 == 7'b0100000) alu_op=ALU_SRA;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b110: begin //OR
+                        if(funct7 == 7'b0000000) alu_op=ALU_OR;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    3'b111: begin //AND
+                        if(funct7 == 7'b0000000) alu_op=ALU_AND;
+                        else alu_illegal= 1'b1;
+                    end
+
+                    default: alu_illegal= 1'b1;
+                endcase
+            end
+
+            //RV64I immediate ALU operations
+            ALU_CLASS_OP_IMM: begin
+                case(funct3)
+                    3'b000: alu_op = ALU_ADD; //ADDI
+                    3'b010: alu_op = ALU_SLT; //SLTI
+                    3'b011: alu_op = ALU_SLTU; //SLTIU
+                    3'b100: alu_op = ALU_XOR; //XORI
+                    3'b110: alu_op = ALU_OR; //ORI
+                    3'b111: alu_op = ALU_AND; //ANDI
+
+                    3'b001: begin //SLLI --RV64 uses funct6, not funct7
+                        if (funct7[6:1] == 6'b000000) alu_op = ALU_SLL;
+                        //if (funct6 == 6'b000000) alu_op = ALU_SLL;
+                        //else if (funct6 == 6'b010000) alu_op = ALU_SRA;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    3'b101: begin
+                        if (funct7[6:1] == 6'b000000) alu_op = ALU_SRL;
+                        //if (funct6 == 6'b000000) alu_op = ALU_SRL;
+                        else if (funct7[6:1] == 6'b010000) alu_op = ALU_SRA;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    default: alu_illegal= 1'b1;
+                endcase
+            end
+
+            //RV64 "W" register-register word operations
+            ALU_CLASS_OP_32: begin
+                case(funct3)
+                    3'b000: begin // ADDW/SUBW
+                        if (funct7 == 7'b0000000) alu_op = ALU_ADDW;
+                        else if (funct7 == 7'b0100000) alu_op = ALU_SUBW;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    3'b001: begin //SLLW
+                        if (funct7 == 7'b0000000) alu_op = ALU_SLLW;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    3'b101: begin // SRLW/SRAW
+                        if (funct7 == 7'b0000000) alu_op = ALU_SRLW;
+                        else if (funct7 == 7'b0100000) alu_op = ALU_SRAW;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    default: begin
+                        alu_op= ALU_ADD;
+                        alu_illegal= 1'b1;
+                    end
+                endcase
+            end
+
+            //RV64 "W" immediate word operations
+            ALU_CLASS_OP_IMM_32: begin
+                case(funct3)
+                    3'b000: begin
+                        alu_op = ALU_ADDW;
+                    end //ADDIW --full imm, no funct7 check
+
+                    3'b001: begin // SLLIW
+                        if (funct7 == 7'b0000000) alu_op = ALU_SLLW;
+                        //else if (funct7 == 7'b0100000) alu_op = ALU_SUBW;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    3'b101: begin //SRLIW/SRAIW
+                        if (funct7 == 7'b0000000) alu_op = ALU_SRLW;
+                        else if (funct7 == 7'b0100000) alu_op = ALU_SRAW;
+                        else alu_illegal = 1'b1;
+                    end
+
+                    default: begin
+                        alu_op= ALU_ADD;
+                        alu_illegal= 1'b1;
+                    end
+                endcase
+            end
+
+            default: begin
+                alu_op = ALU_ADD; //unrecognized alu_class from the decoder
+                alu_illegal= 1'b1;
+            end
+        endcase
+    end
+
+endmodule
