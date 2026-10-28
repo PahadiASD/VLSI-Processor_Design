@@ -1,0 +1,86 @@
+
+`timescale 1ns/10ps
+
+module tb_alu_control (
+);
+
+    reg [2:0] alu_class;
+    reg [2:0] funct3;
+    reg [6:0] funct7;
+
+    wire [4:0] alu_op;
+    wire alu_illegal;
+
+    alu_control alu_control_i (
+        .alu_class (alu_class),
+        .funct3 (funct3),
+        .funct7 (funct7),
+        .alu_op (alu_op),
+        .alu_illegal (alu_illegal)
+    );
+
+    localparam ALU_CLASS_ADD = 3'd0; //address calc, AUIPC, LUI, JAL/JALR target
+    localparam ALU_CLASS_OP = 3'd1; // R type register-register
+    localparam ALU_CLASS_OP_IMM = 3'd2; // I type immediate ALU ops
+    localparam ALU_CLASS_OP_32 = 3'd3; //R type "W"register-register word ops
+    localparam ALU_CLASS_OP_IMM_32 = 3'd4; // I type "W" immediate word ops
+
+    //alu op encoding
+    localparam ALU_ADD = 5'd0;
+    localparam ALU_SUB = 5'd1;
+    localparam ALU_AND = 5'd2;
+    localparam ALU_OR = 5'd3;
+    localparam ALU_XOR = 5'd4;
+    localparam ALU_SLL = 5'd5;
+    localparam ALU_SRL = 5'd6;
+    localparam ALU_SRA = 5'd7;
+    localparam ALU_SLT = 5'd8;
+    localparam ALU_SLTU = 5'd9;
+    localparam ALU_ADDW = 5'd10;
+    localparam ALU_SUBW = 5'd11;
+    localparam ALU_SLLW = 5'd12;
+    localparam ALU_SRLW = 5'd13;
+    localparam ALU_SRAW = 5'd14;
+
+    integer errors = 0;
+
+    task check;
+        input [4:0] exp_op;
+        input exp_illegal;
+        input [127:0] msg;
+
+        begin
+            #1;
+            if ((alu_op !== exp_op) || (alu_illegal !== exp_illegal)) begin
+                $display("FAIL %0s: class=%0d f3=%03b f7=%07b expected op=%0d illegal=%0d got op=%0d illegal=%0d",
+                    msg, alu_class, funct3, funct7, exp_op, exp_illegal, alu_op, alu_illegal);
+
+                errors = errors+1;
+            end else begin
+                $display("PASS %0s: alu_op=%0d alu_illegal=%0d",
+                    msg, alu_op, alu_illegal);
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////////
+    //// Template for clk and reset generation ////
+    //// uncomment it when needed              ////
+    ///////////////////////////////////////////////
+    //parameter CLKPERIOD = 100;
+
+    //initial clk = 1'b1;
+    //always #(CLKPERIOD/2.0) clk = !clk;
+
+    //initial begin
+    //    a_reset_i = 1'b0;
+    //    #33
+    //    a_reset_i = 1'b1;
+    //end
+    ///////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
