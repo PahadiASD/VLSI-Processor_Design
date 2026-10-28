@@ -1,0 +1,65 @@
+
+// Additional RV64M edge-case tests
+
+// DIVW: INT32_MIN / -1 overflow
+operand_a = 64'h0000000080000000;
+operand_b = 64'hFFFFFFFFFFFFFFFF;
+md_op = MD_DIVW;
+check_result(64'hFFFFFFFF80000000,
+             "DIVW INT32_MIN / -1");
+
+// DIVW: division by zero
+operand_a = 64'd25;
+operand_b = 64'd0;
+md_op = MD_DIVW;
+check_result(64'hFFFFFFFFFFFFFFFF,
+             "DIVW divide by zero");
+
+// DIVUW: division by zero
+operand_a = 64'd25;
+operand_b = 64'd0;
+md_op = MD_DIVUW;
+check_result(64'hFFFFFFFFFFFFFFFF,
+             "DIVUW divide by zero");
+
+// REMW: remainder by zero
+operand_a = 64'h0000000080000005;
+operand_b = 64'd0;
+md_op = MD_REMW;
+check_result(64'hFFFFFFFF80000005,
+             "REMW remainder by zero");
+
+// REMUW: remainder by zero
+operand_a = 64'h0000000080000005;
+operand_b = 64'd0;
+md_op = MD_REMUW;
+check_result(64'hFFFFFFFF80000005,
+             "REMUW remainder by zero");
+
+// DIVUW: unsigned division with sign extension
+operand_a = 64'h00000000FFFFFFFF;
+operand_b = 64'd1;
+md_op = MD_DIVUW;
+check_result(64'hFFFFFFFFFFFFFFFF,
+             "DIVUW sign extension");
+
+// MULW: negative 32-bit result
+operand_a = 64'h000000007FFFFFFF;
+operand_b = 64'd2;
+md_op = MD_MULW;
+check_result(64'hFFFFFFFFFFFFFFFE,
+             "MULW negative word result");
+
+// REMW: signed negative remainder
+operand_a = -64'd10;
+operand_b = 64'd3;
+md_op = MD_REMW;
+check_result(64'hFFFFFFFFFFFFFFFF,
+             "REMW -10 remainder 3");
+
+// Invalid operation encoding
+operand_a = 64'd10;
+operand_b = 64'd3;
+md_op = 4'd15;
+check_result(64'd0,
+             "Invalid operation defaults to zero");
