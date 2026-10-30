@@ -1,0 +1,245 @@
+
+// Fill in testcase specific pattern generation
+
+initial begin
+
+    // ADD
+    instr = r_type(7'b0000000, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG);
+    run_test("ADD", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             ALU_ADD, DC2, DC1, DC3, 1'b1, WB_ALU, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SUB
+    instr = r_type(7'b0100000, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG);
+    run_test("SUB", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_SUB, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // ADDI
+    instr = i_type(12'd5, 5'd2, 3'b000, 5'd1, OP_IMM);
+    run_test("ADDI", (1<<CHK_ALUOP)|(1<<CHK_IMMSEL)|(1<<CHK_RWEN)|(1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             ALU_ADD, DC2, DC1, IMM_I, 1'b1, WB_ALU, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // ANDI
+    instr = i_type(12'h0FF, 5'd2, 3'b111, 5'd1, OP_IMM);
+    run_test("ANDI", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_AND, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SLTI
+    instr = i_type({6'b000000, 6'd4}, 5'd1, 3'b010, 5'd1, OP_IMM);
+    run_test("SLTI", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_SLT, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SRAI
+    instr = i_type({6'b010000, 6'd4}, 5'd2, 3'b101, 5'd1, OP_IMM);
+    run_test("SRAI", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_SRA, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // ADDW
+    instr = r_type(7'b0000000, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG32);
+    run_test("ADDW", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_ADDW, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SUBW
+    instr = r_type(7'b0100000, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG32);
+    run_test("SUBW", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_SUBW, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // ADDIW
+    instr = i_type(12'd5, 5'd2, 3'b000, 5'd1, OP_IMM32);
+    run_test("ADDIW", (1<<CHK_ALUOP)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             ALU_ADDW, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // LUI
+    instr = u_type(20'h12345, 5'd1, OP_LUI);
+    run_test("LUI", (1<<CHK_ALUOP)|(1<<CHK_ASELA)|(1<<CHK_ASELB)|
+             (1<<CHK_IMMSEL)|(1<<CHK_RWEN)|(1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             ALU_ADD, 2'd2, 1'b1, IMM_U, 1'b1, WB_ALU, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // AUIPC
+    instr = u_type(20'h00001, 5'd1, OP_AUIPC);
+    run_test("AUIPC", (1<<CHK_ALUOP)|(1<<CHK_ASELA)|(1<<CHK_ASELB)|
+             (1<<CHK_IMMSEL)|(1<<CHK_RWEN)|(1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             ALU_ADD, 2'd2, 1'b1, IMM_U, 1'b1, WB_ALU, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // LB
+    instr = i_type(12'd0, 5'd2, 3'b000, 5'd1, OP_LOAD);
+    run_test("LB", (1<<CHK_LSUEN)|(1<<CHK_LSUOP)|(1<<CHK_RWEN)|
+             (1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b1, WB_LOAD, DC1, DC3,
+             DC1, DC1, 1'b1, LSU_LB, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // LD
+    instr = i_type(12'd0, 5'd2, 3'b011, 5'd1, OP_LOAD);
+    run_test("LD", (1<<CHK_LSUEN)|(1<<CHK_LSUOP)|(1<<CHK_RWEN)|
+             (1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b1, WB_LOAD, DC1, DC3,
+             DC1, DC1, 1'b1, LSU_LD, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // LWU
+    instr = i_type(12'd0, 5'd2, 3'b110, 5'd1, OP_LOAD);
+    run_test("LWU", (1<<CHK_LSUEN)|(1<<CHK_LSUOP)|(1<<CHK_RWEN)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b1, DC3, DC1, DC3,
+             DC1, DC1, 1'b1, LSU_LWU, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SB
+    instr = s_type(12'd0, 5'd3, 5'd2, 3'b000, OP_STORE);
+    run_test("SB", (1<<CHK_LSUEN)|(1<<CHK_LSUOP)|(1<<CHK_RWEN)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, DC1, DC3,
+             DC1, DC1, 1'b1, LSU_SB, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // SD
+    instr = s_type(12'd0, 5'd3, 5'd2, 3'b011, OP_STORE);
+    run_test("SD", (1<<CHK_LSUEN)|(1<<CHK_LSUOP)|(1<<CHK_RWEN)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, DC1, DC3,
+             DC1, DC1, 1'b1, LSU_SD, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // BEQ
+    instr = b_type(13'd8, 5'd2, 5'd1, 3'b000, OP_BRANCH);
+    run_test("BEQ", (1<<CHK_BREN)|(1<<CHK_BROP)|(1<<CHK_RWEN)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, 1'b1, BR_BEQ,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // BLT
+    instr = b_type(13'd8, 5'd2, 5'd1, 3'b100, OP_BRANCH);
+    run_test("BLT", (1<<CHK_BREN)|(1<<CHK_BROP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, 1'b1, BR_BLT,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // BGEU
+    instr = b_type(13'd8, 5'd2, 5'd1, 3'b111, OP_BRANCH);
+    run_test("BGEU", (1<<CHK_BREN)|(1<<CHK_BROP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, 1'b1, BR_BGEU,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // JAL
+    instr = j_type(21'd16, 5'd1, OP_JAL);
+    run_test("JAL", (1<<CHK_JAL)|(1<<CHK_IMMSEL)|(1<<CHK_RWEN)|
+             (1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, IMM_J, 1'b1, WB_PC, DC1, DC3,
+             1'b1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // JALR
+    instr = i_type(12'd4, 5'd2, 3'b000, 5'd1, OP_JALR);
+    run_test("JALR", (1<<CHK_JALR)|(1<<CHK_IMMSEL)|(1<<CHK_RWEN)|
+             (1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, IMM_I, 1'b1, WB_PC, DC1, DC3,
+             DC1, 1'b1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // MUL
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG);
+    run_test("MUL", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_RWEN)|
+             (1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b1, WB_MULDIV, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_MUL, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // MULHU
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b011, 5'd1, OP_REG);
+    run_test("MULHU", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_MULHU, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // DIV
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b100, 5'd1, OP_REG);
+    run_test("DIV", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_DIV, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // REM
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b110, 5'd1, OP_REG);
+    run_test("REM", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_REM, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // MULW
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b000, 5'd1, OP_REG32);
+    run_test("MULW", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_MULW, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // DIVUW
+    instr = r_type(7'b0000001, 5'd3, 5'd2, 3'b101, 5'd1, OP_REG32);
+    run_test("DIVUW", (1<<CHK_MDEN)|(1<<CHK_MDOP)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, 1'b1, MULDIV_DIVUW, DC1, DC2, DC1, DC1, DC1, 1'b0);
+
+    // CSRRW
+    instr = i_type(12'h300, 5'd2, 3'b001, 5'd1, OP_SYSTEM);
+    run_test("CSRRW", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_RWEN)|(1<<CHK_WBSEL)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b1, WB_CSR, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_WRITE, 1'b0, DC1, DC1, 1'b0);
+
+    // CSRRS
+    instr = i_type(12'h300, 5'd2, 3'b010, 5'd1, OP_SYSTEM);
+    run_test("CSRRS", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_SET, 1'b0, DC1, DC1, 1'b0);
+
+    // CSRRC
+    instr = i_type(12'h300, 5'd2, 3'b011, 5'd1, OP_SYSTEM);
+    run_test("CSRRC", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_CLEAR, 1'b0, DC1, DC1, 1'b0);
+
+    // CSRRWI
+    instr = i_type(12'h300, 5'd5, 3'b101, 5'd1, OP_SYSTEM);
+    run_test("CSRRWI", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_WRITE, 1'b1, DC1, DC1, 1'b0);
+
+    // CSRRSI
+    instr = i_type(12'h300, 5'd5, 3'b110, 5'd1, OP_SYSTEM);
+    run_test("CSRRSI", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_SET, 1'b1, DC1, DC1, 1'b0);
+
+    // CSRRCI
+    instr = i_type(12'h300, 5'd5, 3'b111, 5'd1, OP_SYSTEM);
+    run_test("CSRRCI", (1<<CHK_CSREN)|(1<<CHK_CSROP)|(1<<CHK_CSRIMM)|
+             (1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, DC1, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, 1'b1, CSR_CLEAR, 1'b1, DC1, DC1, 1'b0);
+
+    // MRET
+    instr = r_type(7'b0011000, 5'd5, 5'd0, 3'b000, 5'd0, OP_SYSTEM);
+    run_test("MRET", (1<<CHK_MRET)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, 1'b1, DC1, 1'b0);
+
+    // WFI
+    instr = r_type(7'b0001000, 5'd5, 5'd0, 3'b000, 5'd0, OP_SYSTEM);
+    run_test("WFI", (1<<CHK_WFI)|(1<<CHK_RWEN)|(1<<CHK_ILLEGAL),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, 1'b1, 1'b0);
+
+    // Illegal opcode
+    instr = 32'b0000000_00000_00000_000_00000_1111111;
+    run_test("ILLEGAL_OPCODE", (1<<CHK_ILLEGAL)|(1<<CHK_RWEN),
+             DC5, DC2, DC1, DC3, 1'b0, DC3, DC1, DC3,
+             DC1, DC1, DC1, DC4, DC1, DC4, DC1, DC2, DC1, DC1, DC1, 1'b1);
+
+    if (fail_count == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", fail_count);
+
+    $finish();
+end
