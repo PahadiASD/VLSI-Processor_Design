@@ -1,0 +1,88 @@
+
+`timescale 1ns/10ps
+
+module tb_operand_control (
+);
+
+    reg [63:0] rs1_data;
+    reg [63:0] rs2_data;
+    reg [63:0] pc;
+    reg [63:0] immediate;
+    reg [1:0] alu_src_a_sel;
+    reg [1:0] alu_src_b_sel;
+
+    wire [63:0] alu_operand_a;
+    wire [63:0] alu_operand_b;
+
+    localparam [1:0] SRC_A_RS1  = 2'b00;
+    localparam [1:0] SRC_A_PC   = 2'b01;
+    localparam [1:0] SRC_A_ZERO = 2'b10;
+    localparam [1:0] SRC_A_RSVD = 2'b11;
+
+    localparam [1:0] SRC_B_RS2 = 2'b00;
+    localparam [1:0] SRC_B_IMM = 2'b01;
+    localparam [1:0] SRC_B_4   = 2'b10;
+    localparam [1:0] SRC_B_2   = 2'b11;
+
+    integer total_tests = 0;
+    integer passed_tests = 0;
+    integer failed_tests = 0;
+
+    operand_control operand_control_i (
+        .rs1_data      (rs1_data),
+        .rs2_data      (rs2_data),
+        .pc            (pc),
+        .immediate     (immediate),
+        .alu_src_a_sel (alu_src_a_sel),
+        .alu_src_b_sel (alu_src_b_sel),
+        .alu_operand_a (alu_operand_a),
+        .alu_operand_b (alu_operand_b)
+    );
+
+    task run_check;
+        input [63:0] exp_a;
+        input [63:0] exp_b;
+        input [255:0] test_name;
+
+        begin
+            total_tests = total_tests + 1;
+            #1;
+
+            if ((alu_operand_a === exp_a) &&
+                (alu_operand_b === exp_b)) begin
+
+                passed_tests = passed_tests + 1;
+                $display("TEST %02d: PASS (%0s)", total_tests, test_name);
+
+            end else begin
+
+                failed_tests = failed_tests + 1;
+                $display("TEST %02d: FAIL (%0s)", total_tests, test_name);
+                $display(" expected: operand_a=0x%016h operand_b=0x%016h", exp_a, exp_b);
+                $display(" actual: operand_a=0x%016h operand_b=0x%016h", alu_operand_a, alu_operand_b);
+
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////////
+    /// Template for clk and reset generation  ///
+    /// uncomment it when needed               ///
+    ///////////////////////////////////////////////
+    /*parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end*/
+    ///////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
