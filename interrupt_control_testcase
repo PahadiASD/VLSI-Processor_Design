@@ -1,0 +1,314 @@
+
+initial begin
+    a_reset_l = 1'b0;
+    irq0 = 1'b0;
+    irq1 = 1'b0;
+    instruction_done = 1'b0;
+    interrupt_return_pc = 64'h0;
+    mstatus_mie = 1'b0;
+    mepc = 64'h0;
+    is_mret = 1'b0;
+
+    #1;
+
+    // Test 1: reset behaviour
+    irq0 = 1'b1;
+    irq1 = 1'b1;
+    mstatus_mie = 1'b1;
+    instruction_done = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "Reset pc_redirect");
+    chk1(irq0_ack, 1'b0, "Reset irq0_ack");
+    chk1(irq1_ack, 1'b0, "Reset irq1_ack");
+    chk1(trap_mepc_we, 1'b0, "Reset trap_mepc_we");
+    chk1(trap_mcause_we, 1'b0, "Reset trap_mcause_we");
+    chk1(mie_clear, 1'b0, "Reset mie_clear");
+    chk1(mie_restore, 1'b0, "Reset mie_restore");
+
+    irq0 = 1'b0;
+    irq1 = 1'b0;
+    mstatus_mie = 1'b0;
+    instruction_done = 1'b0;
+
+    @(posedge clk);
+    #1;
+    a_reset_l = 1'b1;
+    @(negedge clk);
+
+    // Test 2: IRQ0 normal interrupt
+    interrupt_return_pc = 64'h0000000000001000;
+    mstatus_mie = 1'b1;
+    instruction_done = 1'b1;
+    irq0 = 1'b1;
+    irq1 = 1'b0;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "IRQ0 pc redirect");
+    chk64(pc_redirect_target, IRQ0_HANDLER, "IRQ0 handler address");
+    chk1(irq0_ack, 1'b1, "IRQ0 acknowledged");
+    chk1(irq1_ack, 1'b0, "IRQ1 acknowledge remains low");
+    chk1(trap_mepc_we, 1'b1, "IRQ0 trap mepc_we");
+    chk64(trap_mepc, 64'h0000000000001000, "IRQ0 trap_mepc");
+    chk1(trap_mcause_we, 1'b1, "IRQ0 trap mcause_we");
+    chk64(trap_mcause, MCAUSE_IRQ0, "IRQ0 mcause");
+    chk1(mie_clear, 1'b1, "IRQ0 clears MIE");
+    chk1(mie_restore, 1'b0, "IRQ0 does not restore MIE");
+
+    // Test 3: ACK only one cycle
+    @(posedge clk);
+    #1;
+    chk1(irq0_ack, 1'b0, "IRQ0 held high does not re-ack");
+    chk1(pc_redirect, 1'b0, "IRQ0 held high does not redirect again");
+    chk1(trap_mepc_we, 1'b0, "IRQ0 held high does not rewrite mepc");
+    chk1(trap_mcause_we, 1'b0, "IRQ0 held high does not rewrite mcause");
+
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 4: IRQ1 normal interrupt
+    interrupt_return_pc = 64'h0000000000002000;
+    irq1 = 1'b1;
+    irq0 = 1'b0;
+    mstatus_mie = 1'b1;
+    instruction_done = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "IRQ1 pc redirect");
+    chk64(pc_redirect_target, IRQ1_HANDLER, "IRQ1 handler address");
+    chk1(irq1_ack, 1'b1, "IRQ1 acknowledged");
+    chk1(irq0_ack, 1'b0, "IRQ0 acknowledge remains low");
+    chk1(trap_mepc_we, 1'b1, "IRQ1 trap mepc_we");
+    chk64(trap_mepc, 64'h0000000000002000, "IRQ1 trap_mepc");
+    chk1(trap_mcause_we, 1'b1, "IRQ1 trap mcause_we");
+    chk64(trap_mcause, MCAUSE_IRQ1, "IRQ1 mcause");
+    chk1(mie_clear, 1'b1, "IRQ1 clears MIE");
+
+    @(posedge clk);
+    #1;
+    chk1(irq1_ack, 1'b0, "IRQ1 held high does not re-ack");
+    chk1(pc_redirect, 1'b0, "IRQ1 held high does not redirect again");
+
+    irq1 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 5: simultaneous IRQ0 and IRQ1
+    irq0 = 1'b1;
+    irq1 = 1'b1;
+    mstatus_mie = 1'b1;
+    instruction_done = 1'b1;
+    interrupt_return_pc = 64'h0000000000003000;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "Simultaneous IRQ redirect");
+    chk64(pc_redirect_target, IRQ0_HANDLER, "IRQ0 priority over IRQ1");
+    chk1(irq0_ack, 1'b1, "IRQ0 acknowledged first");
+    chk1(irq1_ack, 1'b0, "IRQ1 not acknowledged first");
+    chk64(trap_mcause, MCAUSE_IRQ0, "Priority mcause is IRQ0");
+
+    // Test 6: IRQ1 accepted after IRQ0
+    @(posedge clk);
+    #1;
+    chk1(irq0_ack, 1'b0, "IRQ0 not acknowledged twice");
+    chk1(irq1_ack, 1'b1, "IRQ1 accepted after IRQ0");
+    chk1(pc_redirect, 1'b1, "IRQ1 redirect after IRQ0");
+    chk64(pc_redirect_target, IRQ1_HANDLER, "IRQ1 handler after IRQ0");
+    chk64(trap_mcause, MCAUSE_IRQ1, "IRQ1 mcause after IRQ0");
+
+    irq0 = 1'b0;
+    irq1 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 7: MIE disabled
+    irq0 = 1'b1;
+    mstatus_mie = 1'b0;
+    instruction_done = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "MIE disabled no redirect");
+    chk1(irq0_ack, 1'b0, "MIE disabled no IRQ0 ack");
+    chk1(trap_mepc_we, 1'b0, "MIE disabled no mepc write");
+    chk1(trap_mcause_we, 1'b0, "MIE disabled no mcause write");
+    chk1(mie_clear, 1'b0, "MIE disabled no mie_clear");
+
+    // Test 8: pending IRQ accepted when MIE enabled
+    mstatus_mie = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "IRQ accepted after MIE enabled");
+    chk1(irq0_ack, 1'b1, "IRQ0 ack after MIE enabled");
+    chk64(pc_redirect_target, IRQ0_HANDLER, "IRQ0 target after MIE enabled");
+
+    @(posedge clk);
+    #1;
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 9: interrupt waits for instruction boundary
+    irq0 = 1'b1;
+    mstatus_mie = 1'b1;
+    instruction_done = 1'b0;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "instruction_done=0 no redirect");
+    chk1(irq0_ack, 1'b0, "instruction_done=0 no ack");
+    chk1(trap_mepc_we, 1'b0, "instruction_done=0 no mepc write");
+
+    // Test 10: instruction completes
+    interrupt_return_pc = 64'h0000000000004000;
+    instruction_done = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "IRQ accepted when instruction_done=1");
+    chk1(irq0_ack, 1'b1, "IRQ ack when instruction completes");
+    chk64(trap_mepc, 64'h0000000000004000, "Correct return PC saved");
+
+    @(posedge clk);
+    #1;
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 11: persistent IRQ
+    irq0 = 1'b1;
+    instruction_done = 1'b1;
+    mstatus_mie = 1'b1;
+
+    #1;
+    chk1(irq0_ack, 1'b1, "Persistent IRQ initial ack");
+
+    @(posedge clk);
+    #1;
+    chk1(irq0_ack, 1'b0, "Persistent IRQ cycle 2 no ack");
+
+    @(posedge clk);
+    #1;
+    chk1(irq0_ack, 1'b0, "Persistent IRQ cycle 3 no ack");
+
+    @(posedge clk);
+    #1;
+    chk1(irq0_ack, 1'b0, "Persistent IRQ cycle 4 no ack");
+
+    // Test 12: release and reassert IRQ0
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+    irq0 = 1'b1;
+    #1;
+    chk1(irq0_ack, 1'b1, "IRQ accepted after release and reassert");
+    chk1(pc_redirect, 1'b1, "IRQ0 redirects after reassert");
+
+    @(posedge clk);
+    #1;
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 13: MRET
+    irq0 = 1'b0;
+    irq1 = 1'b0;
+    is_mret = 1'b1;
+    instruction_done = 1'b1;
+    mepc = 64'h0000000012345678;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "MRET pc redirect");
+    chk64(pc_redirect_target, 64'h0000000012345678, "MRET target equals mepc");
+    chk1(mie_restore, 1'b1, "MRET restores MIE");
+    chk1(mie_clear, 1'b0, "MRET does not clear MIE");
+    chk1(irq0_ack, 1'b0, "MRET no IRQ0 ack");
+    chk1(irq1_ack, 1'b0, "MRET no IRQ1 ack");
+    chk1(trap_mepc_we, 1'b0, "MRET does not write mepc");
+    chk1(trap_mcause_we, 1'b0, "MRET does not write mcause");
+
+    // Test 14: MRET priority over IRQ
+    irq0 = 1'b1;
+    is_mret = 1'b1;
+    instruction_done = 1'b1;
+    mstatus_mie = 1'b1;
+    mepc = 64'h0000000000ABCDEF00;
+
+    #1;
+    chk1(pc_redirect, 1'b1, "MRET plus IRQ redirect");
+    chk64(pc_redirect_target, 64'h0000000000ABCDEF00, "MRET wins over IRQ");
+    chk1(mie_restore, 1'b1, "MRET plus IRQ mie_restore");
+    chk1(irq0_ack, 1'b0, "IRQ not acknowledged during MRET");
+    chk1(mie_clear, 1'b0, "MRET plus IRQ no mie_clear");
+    chk1(trap_mepc_we, 1'b0, "MRET plus IRQ no trap mepc write");
+    chk1(trap_mcause_we, 1'b0, "MRET plus IRQ no trap mcause write");
+
+    is_mret = 1'b0;
+    irq0 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 15: MRET waits for instruction_done
+    is_mret = 1'b1;
+    instruction_done = 1'b0;
+    mepc = 64'h000000005555AAAA;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "MRET instruction_done=0 no redirect");
+    chk1(mie_restore, 1'b0, "MRET instruction_done=0 no restore");
+
+    instruction_done = 1'b1;
+    #1;
+    chk1(pc_redirect, 1'b1, "MRET accepted at instruction boundary");
+    chk64(pc_redirect_target, 64'h000000005555AAAA, "MRET correct mepc target");
+    chk1(mie_restore, 1'b1, "MRET restores MIE at instruction boundary");
+
+    is_mret = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Test 16: IRQ1 waits during unfinished operation
+    irq1 = 1'b1;
+    instruction_done = 1'b0;
+    mstatus_mie = 1'b1;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "IRQ1 unfinished operation no redirect");
+    chk1(irq1_ack, 1'b0, "IRQ1 unfinished operation no ack");
+
+    @(posedge clk);
+    #1;
+    chk1(pc_redirect, 1'b0, "IRQ1 still waiting");
+
+    instruction_done = 1'b1;
+    #1;
+    chk1(pc_redirect, 1'b1, "IRQ1 accepted when operation finishes");
+    chk1(irq1_ack, 1'b1, "IRQ1 ack when operation finishes");
+    chk64(pc_redirect_target, IRQ1_HANDLER, "IRQ1 correct handler after wait");
+
+    @(posedge clk);
+    #1;
+    irq1 = 1'b0;
+    @(posedge clk);
+    #1;
+
+    // Final IDLE test
+    irq0 = 1'b0;
+    irq1 = 1'b0;
+    is_mret = 1'b0;
+    instruction_done = 1'b0;
+
+    #1;
+    chk1(pc_redirect, 1'b0, "Final idle pc_redirect");
+    chk1(irq0_ack, 1'b0, "Final idle irq0_ack");
+    chk1(irq1_ack, 1'b0, "Final idle irq1_ack");
+    chk1(trap_mepc_we, 1'b0, "Final idle trap_mepc_we");
+    chk1(trap_mcause_we, 1'b0, "Final idle trap_mcause_we");
+    chk1(mie_clear, 1'b0, "Final idle mie_clear");
+    chk1(mie_restore, 1'b0, "Final idle mie_restore");
+
+    if (errors == 0)
+        $display("\n*** ALL INTERRUPT_CONTROL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d INTERRUPT_CONTROL TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
