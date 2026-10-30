@@ -1,0 +1,55 @@
+
+`timescale 1ns/10ps
+
+module operand_control (
+    //datapath inputs
+
+    input wire [63:0] rs1_data,
+    input wire [63:0] rs2_data,
+    input wire [63:0] pc,
+    input wire [63:0] immediate,
+
+    //control signals from the instruction decoder
+    input wire [1:0] alu_src_a_sel,
+    input wire [1:0] alu_src_b_sel,
+
+    //outputs to the ALU
+    output reg [63:0] alu_operand_a,
+    output reg [63:0] alu_operand_b
+);
+
+    //alu_src_a_sel encoding
+    localparam [1:0] SRC_A_RS1  = 2'b00;
+    localparam [1:0] SRC_A_PC   = 2'b01;
+    localparam [1:0] SRC_A_ZERO = 2'b10;
+
+    //2'b11 is reserved --falls to the default branch below
+
+    //alu_src_b_sel encoding
+    localparam [1:0] SRC_B_RS2 = 2'b00;
+    localparam [1:0] SRC_B_IMM = 2'b01;
+    localparam [1:0] SRC_B_4   = 2'b10;
+    localparam [1:0] SRC_B_2   = 2'b11;
+
+    //operand A mux
+    always @* begin
+        case(alu_src_a_sel)
+            SRC_A_RS1:  alu_operand_a = rs1_data;
+            SRC_A_PC:   alu_operand_a = pc;
+            SRC_A_ZERO: alu_operand_a = 64'b0;
+            default:    alu_operand_a = 64'b0; //reserved encoding -> safe default
+        endcase
+    end
+
+    //operand B mux
+    always @* begin
+        case(alu_src_b_sel)
+            SRC_B_RS2: alu_operand_b = rs2_data;
+            SRC_B_IMM: alu_operand_b = immediate;
+            SRC_B_4:   alu_operand_b = 64'd4;
+            SRC_B_2:   alu_operand_b = 64'd2;
+            default:   alu_operand_b = 64'b0; //unreachable (all 4 encodings used), kept for latch safety
+        endcase
+    end
+
+endmodule
