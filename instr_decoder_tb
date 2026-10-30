@@ -1,0 +1,427 @@
+
+`timescale 1ns/10ps
+
+module tb_instr_decoder ();
+
+    //reg clk;
+    //reg a_reset_l;
+
+    localparam [2:0] IMM_I = 3'd0;
+    localparam [2:0] IMM_S = 3'd1;
+    localparam [2:0] IMM_B = 3'd2;
+    localparam [2:0] IMM_U = 3'd3;
+    localparam [2:0] IMM_J = 3'd4;
+
+    localparam [4:0] ALU_ADD  = 5'd0;
+    localparam [4:0] ALU_SUB  = 5'd1;
+    localparam [4:0] ALU_AND  = 5'd2;
+    localparam [4:0] ALU_OR   = 5'd3;
+    localparam [4:0] ALU_XOR  = 5'd4;
+    localparam [4:0] ALU_SLL  = 5'd5;
+    localparam [4:0] ALU_SRL  = 5'd6;
+    localparam [4:0] ALU_SRA  = 5'd7;
+    localparam [4:0] ALU_SLT  = 5'd8;
+    localparam [4:0] ALU_SLTU = 5'd9;
+    localparam [4:0] ALU_ADDW = 5'd10;
+    localparam [4:0] ALU_SUBW = 5'd11;
+    localparam [4:0] ALU_SLLW = 5'd12;
+    localparam [4:0] ALU_SRLW = 5'd13;
+    localparam [4:0] ALU_SRAW = 5'd14;
+
+    localparam [2:0] WB_ALU    = 3'd0;
+    localparam [2:0] WB_MULDIV = 3'd1;
+    localparam [2:0] WB_LOAD   = 3'd2;
+    localparam [2:0] WB_PC     = 3'd3;
+    localparam [2:0] WB_CSR    = 3'd4;
+
+    localparam [3:0] MULDIV_MUL   = 4'b0000;
+    localparam [3:0] MULDIV_MULHU = 4'b0011;
+    localparam [3:0] MULDIV_DIV   = 4'b0100;
+    localparam [3:0] MULDIV_REM   = 4'b0110;
+    localparam [3:0] MULDIV_MULW  = 4'b1000;
+    localparam [3:0] MULDIV_DIVUW = 4'b1101;
+    localparam [3:0] MULDIV_REMW  = 4'b1110;
+    localparam [3:0] MULDIV_REMUW = 4'b1111;
+
+    localparam [3:0] LSU_LB  = 4'b0000;
+    localparam [3:0] LSU_LH  = 4'b0001;
+    localparam [3:0] LSU_LW  = 4'b0010;
+    localparam [3:0] LSU_LD  = 4'b0011;
+    localparam [3:0] LSU_LBU = 4'b0100;
+    localparam [3:0] LSU_LHU = 4'b0101;
+    localparam [3:0] LSU_LWU = 4'b0110;
+    localparam [3:0] LSU_SB  = 4'b1000;
+    localparam [3:0] LSU_SD  = 4'b1011;
+    localparam [3:0] LSU_SH  = 4'b1001;
+    localparam [3:0] LSU_SW  = 4'b1010;
+
+    localparam [2:0] BR_BEQ  = 3'b000;
+    localparam [2:0] BR_BLT  = 3'b100;
+    localparam [2:0] BR_BGEU = 3'b111;
+    localparam [2:0] BR_BNE  = 3'b001;
+    localparam [2:0] BR_BGE  = 3'b101;
+    localparam [2:0] BR_BLTU = 3'b110;
+
+    localparam [1:0] CSR_WRITE = 2'b01;
+    localparam [1:0] CSR_SET   = 2'b10;
+    localparam [1:0] CSR_CLEAR = 2'b11;
+
+    // Opcodes
+    localparam [6:0] OP_LOAD   = 7'b0000011;
+    localparam [6:0] OP_IMM    = 7'b0010011;
+    localparam [6:0] OP_AUIPC  = 7'b0010111;
+    localparam [6:0] OP_IMM32  = 7'b0011011;
+    localparam [6:0] OP_STORE  = 7'b0100011;
+    localparam [6:0] OP_REG    = 7'b0110011;
+    localparam [6:0] OP_LUI    = 7'b0110111;
+    localparam [6:0] OP_REG32  = 7'b0111011;
+    localparam [6:0] OP_BRANCH = 7'b1100011;
+    localparam [6:0] OP_JALR   = 7'b1100111;
+    localparam [6:0] OP_JAL    = 7'b1101111;
+    localparam [6:0] OP_SYSTEM = 7'b1110011;
+
+    // IO
+    //reg branch_en;
+    reg [31:0] instr;
+
+    wire [4:0] rs1_addr, rs2_addr, rd_addr;
+    wire [2:0] imm_sel;
+    wire [4:0] alu_op;
+    wire [1:0] alu_src_a_sel;
+    wire alu_src_b_sel;
+    wire reg_write_en;
+    wire [2:0] wb_sel;
+    wire branch_en;
+    wire [2:0] branch_op;
+    wire jal, jalr;
+    wire lsu_en;
+    wire [3:0] lsu_op;
+    wire muldiv_en;
+    wire [3:0] muldiv_op;
+    wire csr_en;
+    wire [1:0] csr_op;
+    wire csr_imm;
+    wire [11:0] csr_addr;
+    wire is_mret, is_wfi;
+    wire illegal_instr;
+
+    instr_decoder instr_decoder_i (
+        .instr(instr),
+        .rs1_addr(rs1_addr),
+        .rs2_addr(rs2_addr),
+        .rd_addr(rd_addr),
+        .imm_sel(imm_sel),
+        .alu_op(alu_op),
+        .alu_src_a_sel(alu_src_a_sel),
+        .alu_src_b_sel(alu_src_b_sel),
+        .reg_write_en(reg_write_en),
+        .wb_sel(wb_sel),
+        .branch_en(branch_en),
+        .branch_op(branch_op),
+        .jal(jal),
+        .jalr(jalr),
+        .lsu_en(lsu_en),
+        .lsu_op(lsu_op),
+        .muldiv_en(muldiv_en),
+        .muldiv_op(muldiv_op),
+        .csr_en(csr_en),
+        .csr_op(csr_op),
+        .csr_imm(csr_imm),
+        .csr_addr(csr_addr),
+        .is_mret(is_mret),
+        .is_wfi(is_wfi),
+        .illegal_instr(illegal_instr)
+    );
+
+    // Instruction generator functions
+    function [31:0] r_type;
+        input [6:0] funct7;
+        input [4:0] rs2;
+        input [4:0] rs1;
+        input [2:0] funct3;
+        input [4:0] rd;
+        input [6:0] opcode;
+
+        begin
+            r_type = {funct7, rs2, rs1, funct3, rd, opcode};
+        end
+    endfunction
+
+    function [31:0] i_type;
+        input [11:0] imm;
+        input [4:0] rs1;
+        input [2:0] funct3;
+        input [4:0] rd;
+        input [6:0] opcode;
+
+        begin
+            i_type = {imm, rs1, funct3, rd, opcode};
+        end
+    endfunction
+
+    function [31:0] s_type;
+        input [11:0] imm;
+        input [4:0] rs2;
+        input [4:0] rs1;
+        input [2:0] funct3;
+        input [6:0] opcode;
+
+        begin
+            s_type = {imm[11:5], rs2, rs1, funct3,
+                      imm[4:0], opcode};
+        end
+    endfunction
+
+    function [31:0] b_type;
+        input [12:0] imm;
+        input [4:0] rs2;
+        input [4:0] rs1;
+        input [2:0] funct3;
+        input [6:0] opcode;
+
+        begin
+            b_type = {imm[12], imm[10:5], rs2, rs1,
+                      funct3, imm[4:1], imm[11], opcode};
+        end
+    endfunction
+
+    function [31:0] u_type;
+        input [19:0] imm;
+        input [4:0] rd;
+        input [6:0] opcode;
+
+        begin
+            u_type = {imm, rd, opcode};
+        end
+    endfunction
+
+    function [31:0] j_type;
+        input [20:0] imm;
+        input [4:0] rd;
+        input [6:0] opcode;
+
+        begin
+            j_type = {imm[20], imm[10:1], imm[11],
+                      imm[19:12], rd, opcode};
+        end
+    endfunction
+
+    // Verification counters
+    integer pass_count = 0;
+    integer fail_count = 0;
+
+    // Fields checked by run_test
+    localparam
+        CHK_ALUOP   = 0,
+        CHK_ASELA   = 1,
+        CHK_ASELB   = 2,
+        CHK_IMMSEL  = 3,
+        CHK_RWEN    = 4,
+        CHK_WBSEL   = 5,
+        CHK_BREN    = 6,
+        CHK_BROP    = 7,
+        CHK_JAL     = 8,
+        CHK_JALR    = 9,
+        CHK_LSUEN   = 10,
+        CHK_LSUOP   = 11,
+        CHK_MDEN    = 12,
+        CHK_MDOP    = 13,
+        CHK_CSREN   = 14,
+        CHK_CSROP   = 15,
+        CHK_CSRIMM  = 16,
+        CHK_MRET    = 17,
+        CHK_WFI     = 18,
+        CHK_ILLEGAL = 19;
+
+    // Test checking task
+    task run_test;
+        input [127:0] name;
+        input [31:0] exp_mask;
+
+        input [4:0] e_alu_op;
+        input [1:0] e_asel_a;
+        input e_asel_b;
+        input [2:0] e_imm_sel;
+
+        input e_rwen;
+        input [2:0] e_wb_sel;
+
+        input e_bren;
+        input [2:0] e_brop;
+
+        input e_jal;
+        input e_jalr;
+
+        input e_lsuen;
+        input [3:0] e_lsuop;
+
+        input e_mden;
+        input [3:0] e_mdop;
+
+        input e_csren;
+        input [1:0] e_csrop;
+        input e_csrimm;
+
+        input e_mret;
+        input e_wfi;
+
+        input e_illegal;
+
+        reg pass;
+
+        begin
+            #1;
+
+            pass = 1'b1;
+
+            if (exp_mask[CHK_ALUOP] &&
+                alu_op !== e_alu_op)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_ASELA] &&
+                alu_src_a_sel !== e_asel_a)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_ASELB] &&
+                alu_src_b_sel !== e_asel_b)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_IMMSEL] &&
+                imm_sel !== e_imm_sel)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_RWEN] &&
+                reg_write_en !== e_rwen)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_WBSEL] &&
+                wb_sel !== e_wb_sel)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_BREN] &&
+                branch_en !== e_bren)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_BROP] &&
+                branch_op !== e_brop)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_JAL] &&
+                jal !== e_jal)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_JALR] &&
+                jalr !== e_jalr)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_LSUEN] &&
+                lsu_en !== e_lsuen)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_LSUOP] &&
+                lsu_op !== e_lsuop)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_MDEN] &&
+                muldiv_en !== e_mden)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_MDOP] &&
+                muldiv_op !== e_mdop)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_CSREN] &&
+                csr_en !== e_csren)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_CSROP] &&
+                csr_op !== e_csrop)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_CSRIMM] &&
+                csr_imm !== e_csrimm)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_MRET] &&
+                is_mret !== e_mret)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_WFI] &&
+                is_wfi !== e_wfi)
+                pass = 1'b0;
+
+            if (exp_mask[CHK_ILLEGAL] &&
+                illegal_instr !== e_illegal)
+                pass = 1'b0;
+
+            if (pass) begin
+                pass_count = pass_count + 1;
+
+                $display(
+                    "PASS %0s",
+                    name
+                );
+            end
+            else begin
+                fail_count = fail_count + 1;
+
+                $display(
+                    "FAIL %0s: instr=%h alu_op=%0d asel_a=%0d asel_b=%0d imm_sel=%0d rwen=%0d wb_sel=%0d bren=%0d brop=%0d jal=%0d jalr=%0d lsuen=%0d lsuop=%0d mden=%0d mdop=%0d csren=%0d csrop=%0d csrimm=%0d mret=%0d wfi=%0d illegal=%0d",
+                    name,
+                    instr,
+                    alu_op,
+                    alu_src_a_sel,
+                    alu_src_b_sel,
+                    imm_sel,
+                    reg_write_en,
+                    wb_sel,
+                    branch_en,
+                    branch_op,
+                    jal,
+                    jalr,
+                    lsu_en,
+                    lsu_op,
+                    muldiv_en,
+                    muldiv_op,
+                    csr_en,
+                    csr_op,
+                    csr_imm,
+                    is_mret,
+                    is_wfi,
+                    illegal_instr
+                );
+            end
+        end
+    endtask
+
+    // Don't care values used in testcase
+    localparam [4:0] DC5 = 5'b0;
+    localparam [1:0] DC2 = 2'b0;
+    localparam DC1 = 1'b0;
+    localparam [2:0] DC3 = 3'b0;
+    localparam [3:0] DC4 = 4'b0;
+
+    ////////////////////////////////////////////////
+    // Template for clk and reset generation
+    // Uncomment it when needed
+    ////////////////////////////////////////////////
+
+    /*parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end*/
+
+    ////////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File has to be situated in
+    // simulation/<simulator_name>/<testcase> directory
+    `include "testcase.v"
+
+endmodule
