@@ -1,0 +1,596 @@
+
+`timescale 1ns/10ps
+
+module instr_decoder (
+    input [31:0] instr,
+
+    output [4:0] rs1_addr,
+    output [4:0] rs2_addr,
+    output [4:0] rd_addr,
+
+    output reg [2:0] imm_sel,
+
+    output reg [4:0] alu_op,
+    output reg [1:0] alu_src_a_sel,
+    output reg alu_src_b_sel,
+
+    output reg reg_write_en,
+    output reg [2:0] wb_sel,
+
+    output reg branch_en,
+    output reg [2:0] branch_op,
+    output reg jal,
+    output reg jalr,
+
+    output reg lsu_en,
+    output reg [3:0] lsu_op,
+
+    output reg muldiv_en,
+    output reg [3:0] muldiv_op,
+
+    output reg csr_en,
+    output reg [1:0] csr_op,
+    output reg csr_imm,
+    output [11:0] csr_addr,
+
+    output reg is_mret,
+    output reg is_wfi,
+
+    output reg illegal_instr
+);
+
+    // Field extraction
+    wire [6:0] opcode = instr[6:0];
+    wire [4:0] rd = instr[11:7];
+    wire [2:0] funct3 = instr[14:12];
+    wire [4:0] rs1 = instr[19:15];
+    wire [4:0] rs2 = instr[24:20];
+    wire [6:0] funct7 = instr[31:25];
+    wire [11:0] funct12 = instr[31:20];
+
+    assign rs1_addr = rs1;
+    assign rs2_addr = rs2;
+    assign rd_addr = rd;
+    assign csr_addr = instr[31:20];
+
+    // Opcode map
+    localparam [6:0] OP_LOAD   = 7'b0000011;
+    localparam [6:0] OP_IMM    = 7'b0010011;
+    localparam [6:0] OP_AUIPC  = 7'b0010111;
+    localparam [6:0] OP_IMM32  = 7'b0011011;
+    localparam [6:0] OP_STORE  = 7'b0100011;
+    localparam [6:0] OP_REG    = 7'b0110011;
+    localparam [6:0] OP_LUI    = 7'b0110111;
+    localparam [6:0] OP_REG32  = 7'b0111011;
+    localparam [6:0] OP_BRANCH = 7'b1100011;
+    localparam [6:0] OP_JALR   = 7'b1100111;
+    localparam [6:0] OP_JAL    = 7'b1101111;
+    localparam [6:0] OP_SYSTEM = 7'b1110011;
+
+    // Immediate selection encoding
+    localparam [2:0] IMM_I = 3'd0;
+    localparam [2:0] IMM_S = 3'd1;
+    localparam [2:0] IMM_B = 3'd2;
+    localparam [2:0] IMM_U = 3'd3;
+    localparam [2:0] IMM_J = 3'd4;
+
+    // ALU operation encoding
+    localparam [4:0] ALU_ADD  = 5'd0;
+    localparam [4:0] ALU_SUB  = 5'd1;
+    localparam [4:0] ALU_AND  = 5'd2;
+    localparam [4:0] ALU_OR   = 5'd3;
+    localparam [4:0] ALU_XOR  = 5'd4;
+    localparam [4:0] ALU_SLL  = 5'd5;
+    localparam [4:0] ALU_SRL  = 5'd6;
+    localparam [4:0] ALU_SRA  = 5'd7;
+    localparam [4:0] ALU_SLT  = 5'd8;
+    localparam [4:0] ALU_SLTU = 5'd9;
+    localparam [4:0] ALU_ADDW = 5'd10;
+    localparam [4:0] ALU_SUBW = 5'd11;
+    localparam [4:0] ALU_SLLW = 5'd12;
+    localparam [4:0] ALU_SRLW = 5'd13;
+    localparam [4:0] ALU_SRAW = 5'd14;
+
+    // ALU operand selection
+    localparam [1:0] ASEL_RS1  = 2'd0;
+    localparam [1:0] ASEL_PC   = 2'd1;
+    localparam [1:0] ASEL_ZERO = 2'd2;
+
+    localparam BSEL_RS2 = 1'b0;
+    localparam BSEL_IMM = 1'b1;
+
+    // Write-back selection
+    localparam [2:0] WB_ALU    = 3'd0;
+    localparam [2:0] WB_MULDIV = 3'd1;
+    localparam [2:0] WB_LOAD   = 3'd2;
+    localparam [2:0] WB_PC     = 3'd3;
+    localparam [2:0] WB_CSR    = 3'd4;
+
+    // Multiply/divide encoding
+    localparam [3:0] MULDIV_MUL    = 4'b0_000;
+    localparam [3:0] MULDIV_MULH   = 4'b0_001;
+    localparam [3:0] MULDIV_MULHSU = 4'b0_010;
+    localparam [3:0] MULDIV_MULHU  = 4'b0_011;
+    localparam [3:0] MULDIV_DIV    = 4'b0_100;
+    localparam [3:0] MULDIV_DIVU   = 4'b0_101;
+    localparam [3:0] MULDIV_REM    = 4'b0_110;
+    localparam [3:0] MULDIV_REMU   = 4'b0_111;
+    localparam [3:0] MULDIV_MULW   = 4'b1_000;
+    localparam [3:0] MULDIV_DIVW   = 4'b1_100;
+    localparam [3:0] MULDIV_DIVUW  = 4'b1_101;
+    localparam [3:0] MULDIV_REMW   = 4'b1_110;
+    localparam [3:0] MULDIV_REMUW  = 4'b1_111;
+
+    // LSU operation encoding
+    localparam [3:0] LSU_LB  = 4'b0_000;
+    localparam [3:0] LSU_LH  = 4'b0_001;
+    localparam [3:0] LSU_LW  = 4'b0_010;
+    localparam [3:0] LSU_LD  = 4'b0_011;
+    localparam [3:0] LSU_LBU = 4'b0_100;
+    localparam [3:0] LSU_LHU = 4'b0_101;
+    localparam [3:0] LSU_LWU = 4'b0_110;
+    localparam [3:0] LSU_SB  = 4'b1_000;
+    localparam [3:0] LSU_SH  = 4'b1_001;
+    localparam [3:0] LSU_SW  = 4'b1_010;
+    localparam [3:0] LSU_SD  = 4'b1_011;
+
+    // Branch operation encoding
+    localparam [2:0] BR_BEQ  = 3'b000;
+    localparam [2:0] BR_BNE  = 3'b001;
+    localparam [2:0] BR_BLT  = 3'b100;
+    localparam [2:0] BR_BGE  = 3'b101;
+    localparam [2:0] BR_BLTU = 3'b110;
+    localparam [2:0] BR_BGEU = 3'b111;
+
+    // CSR operation encoding
+    localparam [1:0] CSR_WRITE = 2'b01;
+    localparam [1:0] CSR_SET   = 2'b10;
+    localparam [1:0] CSR_CLEAR = 2'b11;
+
+    // SYSTEM funct12 values
+    localparam [11:0] FUNCT12_MRET = 12'h302;
+    localparam [11:0] FUNCT12_WFI  = 12'h105;
+
+    // Main combinational instruction decoder
+    always @* begin
+
+        // Safe defaults to avoid inferred latches
+        imm_sel       = IMM_I;
+        alu_op        = ALU_ADD;
+        alu_src_a_sel = ASEL_RS1;
+        alu_src_b_sel = BSEL_RS2;
+
+        reg_write_en = 1'b0;
+        wb_sel       = WB_ALU;
+
+        branch_en = 1'b0;
+        branch_op = funct3;
+
+        jal  = 1'b0;
+        jalr = 1'b0;
+
+        lsu_en = 1'b0;
+        lsu_op = 4'b0000;
+
+        muldiv_en = 1'b0;
+        muldiv_op = 4'b0000;
+
+        csr_en  = 1'b0;
+        csr_op  = funct3[1:0];
+        csr_imm = funct3[2];
+
+        is_mret = 1'b0;
+        is_wfi  = 1'b0;
+
+        illegal_instr = 1'b0;
+
+        case (opcode)
+
+            // LUI
+            OP_LUI: begin
+                imm_sel       = IMM_U;
+                alu_op        = ALU_ADD;
+                alu_src_a_sel = ASEL_ZERO;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b1;
+                wb_sel        = WB_ALU;
+            end
+
+            // AUIPC
+            OP_AUIPC: begin
+                imm_sel       = IMM_U;
+                alu_op        = ALU_ADD;
+                alu_src_a_sel = ASEL_PC;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b1;
+                wb_sel        = WB_ALU;
+            end
+
+            // JAL
+            OP_JAL: begin
+                imm_sel      = IMM_J;
+                jal          = 1'b1;
+                reg_write_en = 1'b1;
+                wb_sel       = WB_PC;
+            end
+
+            // JALR
+            OP_JALR: begin
+                if (funct3 == 3'b000) begin
+                    imm_sel      = IMM_I;
+                    jalr         = 1'b1;
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_PC;
+                end else begin
+                    illegal_instr = 1'b1;
+                end
+            end
+
+            // Conditional branches
+            OP_BRANCH: begin
+                imm_sel       = IMM_B;
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_RS2;
+
+                case (funct3)
+                    BR_BEQ, BR_BNE, BR_BLT,
+                    BR_BGE, BR_BLTU, BR_BGEU: begin
+                        branch_en = 1'b1;
+                        branch_op = funct3;
+                    end
+
+                    default: illegal_instr = 1'b1;
+                endcase
+            end
+
+            // Loads
+            OP_LOAD: begin
+                imm_sel       = IMM_I;
+                alu_op        = ALU_ADD;
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b1;
+                wb_sel        = WB_LOAD;
+
+                case (funct3)
+                    3'b000: begin lsu_en = 1'b1; lsu_op = LSU_LB;  end
+                    3'b001: begin lsu_en = 1'b1; lsu_op = LSU_LH;  end
+                    3'b010: begin lsu_en = 1'b1; lsu_op = LSU_LW;  end
+                    3'b011: begin lsu_en = 1'b1; lsu_op = LSU_LD;  end
+                    3'b100: begin lsu_en = 1'b1; lsu_op = LSU_LBU; end
+                    3'b101: begin lsu_en = 1'b1; lsu_op = LSU_LHU; end
+                    3'b110: begin lsu_en = 1'b1; lsu_op = LSU_LWU; end
+
+                    default: begin
+                        illegal_instr = 1'b1;
+                        reg_write_en  = 1'b0;
+                    end
+                endcase
+            end
+
+            // Stores
+            OP_STORE: begin
+                imm_sel       = IMM_S;
+                alu_op        = ALU_ADD;
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b0;
+
+                case (funct3)
+                    3'b000: begin lsu_en = 1'b1; lsu_op = LSU_SB; end
+                    3'b001: begin lsu_en = 1'b1; lsu_op = LSU_SH; end
+                    3'b010: begin lsu_en = 1'b1; lsu_op = LSU_SW; end
+                    3'b011: begin lsu_en = 1'b1; lsu_op = LSU_SD; end
+
+                    default: illegal_instr = 1'b1;
+                endcase
+            end
+
+            // 64-bit immediate ALU operations
+            OP_IMM: begin
+                imm_sel       = IMM_I;
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b1;
+                wb_sel        = WB_ALU;
+
+                case (funct3)
+                    3'b000: alu_op = ALU_ADD;  // ADDI
+                    3'b010: alu_op = ALU_SLT;  // SLTI
+                    3'b011: alu_op = ALU_SLTU; // SLTIU
+                    3'b100: alu_op = ALU_XOR;  // XORI
+                    3'b110: alu_op = ALU_OR;   // ORI
+                    3'b111: alu_op = ALU_AND;  // ANDI
+
+                    3'b001: begin
+                        if (funct7[6:1] == 6'b000000)
+                            alu_op = ALU_SLL;
+                        else begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    end
+
+                    3'b101: begin
+                        if (funct7[6:1] == 6'b000000)
+                            alu_op = ALU_SRL;
+                        else if (funct7[6:1] == 6'b010000)
+                            alu_op = ALU_SRA;
+                        else begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    end
+
+                    default: begin
+                        illegal_instr = 1'b1;
+                        reg_write_en  = 1'b0;
+                    end
+                endcase
+            end
+
+            // RV64 32-bit immediate ALU operations
+            OP_IMM32: begin
+                imm_sel       = IMM_I;
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_IMM;
+                reg_write_en  = 1'b1;
+                wb_sel        = WB_ALU;
+
+                case (funct3)
+                    3'b000: alu_op = ALU_ADDW; // ADDIW
+
+                    3'b001: begin // SLLIW
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SLLW;
+                        else begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    end
+
+                    3'b101: begin // SRLIW/SRAIW
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SRLW;
+                        else if (funct7 == 7'b0100000)
+                            alu_op = ALU_SRAW;
+                        else begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    end
+
+                    default: begin
+                        illegal_instr = 1'b1;
+                        reg_write_en  = 1'b0;
+                    end
+                endcase
+            end
+
+            // Register-register 64-bit ALU and RV64M
+            OP_REG: begin
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_RS2;
+
+                if (funct7 == 7'b0000001) begin
+                    muldiv_en    = 1'b1;
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_MULDIV;
+
+                    case (funct3)
+                        3'b000: muldiv_op = MULDIV_MUL;
+                        3'b001: muldiv_op = MULDIV_MULH;
+                        3'b010: muldiv_op = MULDIV_MULHSU;
+                        3'b011: muldiv_op = MULDIV_MULHU;
+                        3'b100: muldiv_op = MULDIV_DIV;
+                        3'b101: muldiv_op = MULDIV_DIVU;
+                        3'b110: muldiv_op = MULDIV_REM;
+                        3'b111: muldiv_op = MULDIV_REMU;
+                    endcase
+
+                end else begin
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_ALU;
+
+                    case (funct3)
+                        3'b000: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_ADD;
+                            else if (funct7 == 7'b0100000)
+                                alu_op = ALU_SUB;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b001: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SLL;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b010: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SLT;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b011: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SLTU;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b100: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_XOR;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b101: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SRL;
+                            else if (funct7 == 7'b0100000)
+                                alu_op = ALU_SRA;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b110: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_OR;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b111: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_AND;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        default: begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    endcase
+                end
+            end
+
+            // RV64 word register-register operations
+            OP_REG32: begin
+                alu_src_a_sel = ASEL_RS1;
+                alu_src_b_sel = BSEL_RS2;
+
+                if (funct7 == 7'b0000001) begin
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_MULDIV;
+
+                    case (funct3)
+                        3'b000: begin
+                            muldiv_en = 1'b1;
+                            muldiv_op = MULDIV_MULW;
+                        end
+                        3'b100: begin
+                            muldiv_en = 1'b1;
+                            muldiv_op = MULDIV_DIVW;
+                        end
+                        3'b101: begin
+                            muldiv_en = 1'b1;
+                            muldiv_op = MULDIV_DIVUW;
+                        end
+                        3'b110: begin
+                            muldiv_en = 1'b1;
+                            muldiv_op = MULDIV_REMW;
+                        end
+                        3'b111: begin
+                            muldiv_en = 1'b1;
+                            muldiv_op = MULDIV_REMUW;
+                        end
+                        default: begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    endcase
+
+                end else begin
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_ALU;
+
+                    case (funct3)
+                        3'b000: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_ADDW;
+                            else if (funct7 == 7'b0100000)
+                                alu_op = ALU_SUBW;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b001: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SLLW;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        3'b101: begin
+                            if (funct7 == 7'b0000000)
+                                alu_op = ALU_SRLW;
+                            else if (funct7 == 7'b0100000)
+                                alu_op = ALU_SRAW;
+                            else begin
+                                illegal_instr = 1'b1;
+                                reg_write_en  = 1'b0;
+                            end
+                        end
+
+                        default: begin
+                            illegal_instr = 1'b1;
+                            reg_write_en  = 1'b0;
+                        end
+                    endcase
+                end
+            end
+
+            // SYSTEM: MRET, WFI and Zicsr
+            OP_SYSTEM: begin
+                if (funct3 == 3'b000) begin
+                    if (funct12 == FUNCT12_MRET &&
+                        rs1 == 5'b0 && rd == 5'b0) begin
+                        is_mret = 1'b1;
+                    end
+                    else if (funct12 == FUNCT12_WFI &&
+                             rs1 == 5'b0 && rd == 5'b0) begin
+                        is_wfi = 1'b1;
+                    end
+                    else begin
+                        illegal_instr = 1'b1;
+                    end
+
+                end else begin
+                    csr_en       = 1'b1;
+                    csr_op       = funct3[1:0];
+                    csr_imm      = funct3[2];
+                    reg_write_en = 1'b1;
+                    wb_sel       = WB_CSR;
+
+                    if (funct3[1:0] == 2'b00) begin
+                        // funct3 == 100 has no defined Zicsr meaning
+                        illegal_instr = 1'b1;
+                        csr_en        = 1'b0;
+                        reg_write_en  = 1'b0;
+                    end
+                end
+            end
+
+            default: illegal_instr = 1'b1;
+
+        endcase
+    end
+
+endmodule
