@@ -1,0 +1,227 @@
+
+// Fill in testcase specific pattern generation
+initial begin
+    rs1_data  = 64'h1122334455667788;
+    rs2_data  = 64'h8877665544332211;
+    pc        = 64'h0000000000001000;
+    immediate = 64'hFFFFFFFFFFFFFFF0;
+
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+
+    #1;
+
+    // Test1: Register-register operation
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+
+    run_check(rs1_data, rs2_data, "Register-register operation");
+
+    // Test2: Register-immediate operation
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, immediate, "Register-immediate operation");
+
+    // Test3: AUIPC operand selection
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(pc, immediate, "AUIPC operand selection");
+
+    // Test4: LUI operand selection
+    alu_src_a_sel = SRC_A_ZERO;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(64'h0, immediate, "LUI operand selection");
+
+    // Test5: Load address calculation operands
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, immediate, "Load address operands");
+
+    // Test6: Store address calculation operands
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, immediate, "Store address operands");
+
+    // Test7: JAL target operands
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(pc, immediate, "JAL target operands");
+
+    // Test8: JALR target operands
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, immediate, "JALR target operands");
+
+    // Test9: PC+4 selection
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_4;
+
+    run_check(pc, 64'd4, "PC plus 4 operand selection");
+
+    // Test10: PC+2 selection
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_2;
+
+    run_check(pc, 64'd2, "PC plus 2 operand selection");
+
+    // Test11: Reserved operand A selection
+    alu_src_a_sel = SRC_A_RSVD;
+    alu_src_b_sel = SRC_B_RS2;
+
+    run_check(64'h0, rs2_data, "Reserved operand A defaults to zero");
+
+    // Test12: Negative immediate
+    immediate = 64'hFFFFFFFFFFFFFFF0;
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, 64'hFFFFFFFFFFFFFFF0, "Negative immediate passthrough");
+
+    // Test13: Maximum positive immediate
+    immediate = 64'h7FFFFFFFFFFFFFFF;
+
+    run_check(rs1_data, 64'h7FFFFFFFFFFFFFFF, "Maximum positive immediate");
+
+    // Test14: All zero inputs
+    rs1_data  = 64'h0;
+    rs2_data  = 64'h0;
+    pc        = 64'h0;
+    immediate = 64'h0;
+
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+
+    run_check(64'h0, 64'h0, "All-zero input operands");
+
+    // Test15: All-one register values
+    rs1_data = 64'hFFFFFFFFFFFFFFFF;
+    rs2_data = 64'hFFFFFFFFFFFFFFFF;
+
+    run_check(64'hFFFFFFFFFFFFFFFF, 64'hFFFFFFFFFFFFFFFF,
+              "All-one register operands");
+
+    // Test16: Full-width 64-bit register values
+    rs1_data = 64'h123456789ABCDEF0;
+    rs2_data = 64'hFEDCBA9876543210;
+
+    run_check(64'h123456789ABCDEF0, 64'hFEDCBA9876543210,
+              "Full-width 64-bit register values");
+
+    // Test17: Operand A changes independently
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+    rs1_data = 64'hCAFEBABECAFEBABE;
+
+    run_check(64'hCAFEBABECAFEBABE, rs2_data,
+              "Operand A independent update");
+
+    // Test18: Operand B changes independently
+    rs2_data = 64'hDEADBEEFDEADBEEF;
+
+    run_check(rs1_data, 64'hDEADBEEFDEADBEEF,
+              "Operand B independent update");
+
+    // Test19: PC input changes
+    pc = 64'h0000000080000000;
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_4;
+
+    run_check(64'h0000000080000000, 64'd4, "PC input update");
+
+    // Test20: Immediate input changes
+    immediate = 64'h0000000000001234;
+
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(rs1_data, 64'h0000000000001234,
+              "Immediate input update");
+
+    // Test21: Zero source A with constant 4
+    alu_src_a_sel = SRC_A_ZERO;
+    alu_src_b_sel = SRC_B_4;
+
+    run_check(64'h0, 64'd4, "Zero operand A with constant 4");
+
+    // Test22: Zero source A with constant 2
+    alu_src_a_sel = SRC_A_ZERO;
+    alu_src_b_sel = SRC_B_2;
+
+    run_check(64'h0, 64'd2, "Zero operand A with constant 2");
+
+    // Test23: Reserved A with immediate B
+    alu_src_a_sel = SRC_A_RSVD;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(64'h0, immediate, "Reserved A with immediate B");
+
+    // Test24: Reserved A with constant B
+    alu_src_a_sel = SRC_A_RSVD;
+    alu_src_b_sel = SRC_B_4;
+
+    run_check(64'h0, 64'd4, "Reserved A with constant B");
+
+    // Test25: Combinational behavior
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+
+    rs1_data = 64'hAAAAAAAAAAAAAAAA;
+    rs2_data = 64'h5555555555555555;
+
+    run_check(64'hAAAAAAAAAAAAAAAA, 64'h5555555555555555,
+              "Combinational operand update");
+
+    // Test26: PC + immediate selection after changes
+    pc        = 64'h0000000000004000;
+    immediate = 64'hFFFFFFFFFFFFFFFC;
+    alu_src_a_sel = SRC_A_PC;
+    alu_src_b_sel = SRC_B_IMM;
+
+    run_check(64'h0000000000004000, 64'hFFFFFFFFFFFFFFFC,
+              "PC plus negative immediate operands");
+
+    // Test27: ALL operand A selector combinations
+    alu_src_b_sel = SRC_B_RS2;
+    alu_src_a_sel = SRC_A_RS1;
+    run_check(rs1_data, rs2_data, "A selector 00");
+
+    alu_src_a_sel = SRC_A_PC;
+    run_check(pc, rs2_data, "A selector 01");
+
+    alu_src_a_sel = SRC_A_ZERO;
+    run_check(64'h0, rs2_data, "A selector 10");
+
+    alu_src_a_sel = SRC_A_RSVD;
+    run_check(64'h0, rs2_data, "A selector 11");
+
+    // Test28: ALL operand B selector combinations
+    alu_src_a_sel = SRC_A_RS1;
+    alu_src_b_sel = SRC_B_RS2;
+
+    run_check(rs1_data, rs2_data, "B selector 00");
+
+    alu_src_b_sel = SRC_B_IMM;
+    run_check(rs1_data, immediate, "B selector 01");
+
+    alu_src_b_sel = SRC_B_4;
+    run_check(rs1_data, 64'd4, "B selector 10");
+
+    alu_src_b_sel = SRC_B_2;
+    run_check(rs1_data, 64'd2, "B selector 11");
+
+    // Summary
+    if (failed_tests == 0)
+        $display("*** ALL OPERAND_CONTROL TESTS PASSED ***");
+    else
+        $display("*** %0d OPERAND_CONTROL TEST(S) FAILED ***",
+                 failed_tests);
+
+    $finish();
+end
