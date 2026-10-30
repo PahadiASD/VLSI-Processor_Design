@@ -1,0 +1,126 @@
+
+`timescale 1ns/10ps
+
+module interrupt_control #(
+    parameter [63:0] IRQ0_HANDLER = 64'h0000000000000000,
+    parameter [63:0] IRQ1_HANDLER = 64'h0000000000000004,
+    parameter [63:0] MCAUSE_IRQ0 = 64'h8000000000000000,
+    parameter [63:0] MCAUSE_IRQ1 = 64'h8000000000000001
+)(
+    input wire clk,
+    input wire a_reset_l, // active low asynchronous reset
+
+    // External IRQ inputs
+    input wire irq0,
+    input wire irq1,
+
+    // Processor execution state
+    input wire instruction_done, // Instruction boundary pulse/level
+    input wire [63:0] interrupt_return_pc,
+
+    // CSR state (read only views from csr regs)
+    input wire mstatus_mie,
+    input wire [63:0] mepc, // mepc_out, for MRET
+
+    // Decoded system instruction
+    input wire is_mret,
+
+    // IRQ acknowledge
+    output reg irq0_ack,
+    output reg irq1_ack,
+
+    // PC redirect req
+    output reg pc_redirect,
+    output reg [63:0] pc_redirect_target,
+
+    // HW CSR update req
+    output reg trap_mepc_we,
+    output reg [63:0] trap_mepc,
+
+    output reg trap_mcause_we,
+    output reg [63:0] trap_mcause,
+
+    // mstatus.MIE hw control req
+    output reg mie_clear,
+    output reg [63:0] mie_restore
+);
+
+    reg irq0_awaiting_release;
+    reg irq1_awaiting_release;
+
+    wire irq0_pending = irq0 && !irq0_awaiting_release;
+    wire irq1_pending = irq1 && !irq1_awaiting_release;
+
+    wire take_irq0 = irq0_pending &&
+                     mstatus_mie &&
+                     instruction_done &&
+                     !is_mret;
+
+    wire take_irq1 = !take_irq0 &&
+                     irq1_pending &&
+                     mstatus_mie &&
+                     instruction_done &&
+                     !is_mret;
+
+    wire take_mret = is_mret && instruction_done;
+
+    always @(*) begin
+        irq0_ack = 1'b0;
+        irq1_ack = 1'b0;
+        pc_redirect = 1'b0;
+        pc_redirect_target = 64'h0;
+        trap_mepc_we = 1'b0;
+        trap_mepc = 64'h0;
+        trap_mcause_we = 1'b0;
+        trap_mcause = 64'h0;
+        mie_clear = 1'b0;
+        mie_restore = 1'b0;
+
+        if (a_reset_l) begin
+            if (take_mret) begin
+                pc_redirect = 1'b1;
+                pc_redirect_target = mepc;
+                mie_restore = 1'b1;
+
+            end else if (take_irq0) begin
+                pc_redirect = 1'b1;
+                pc_redirect_target = IRQ0_HANDLER;
+                irq0_ack = 1'b1;
+                trap_mepc_we = 1'b1;
+                trap_mepc = interrupt_return_pc;
+                trap_mcause_we = 1'b1;
+                trap_mcause = MCAUSE_IRQ0;
+                mie_clear = 1'b1;
+
+            end else if (take_irq1) begin
+                pc_redirect = 1'b1;
+                pc_redirect_target = IRQ1_HANDLER;
+                irq1_ack = 1'b1;
+                trap_mepc_we = 1'b1;
+                trap_mepc = interrupt_return_pc;
+                trap_mcause_we = 1'b1;
+                trap_mcause = MCAUSE_IRQ1;
+                mie_clear = 1'b1;
+            end
+        end
+    end
+
+    // seq state: awaiting release tracking only
+    always @(posedge clk or negedge a_reset_l) begin
+        if (!a_reset_l) begin
+            irq0_awaiting_release <= 1'b0;
+            irq1_awaiting_release <= 1'b0;
+        end else begin
+            if (!irq0)
+                irq0_awaiting_release <= 1'b0;
+            else if (take_irq0)
+                irq0_awaiting_release <= 1'b1;
+
+            if (!irq1)
+                irq1_awaiting_release <= 1'b0;
+            else if (take_irq1)
+                irq1_awaiting_release <= 1'b1;
+        end
+    end
+
+endmodule
