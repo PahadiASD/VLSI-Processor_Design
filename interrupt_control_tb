@@ -1,0 +1,105 @@
+
+`timescale 1ns/10ps
+
+module tb_interrupt_control ();
+
+    reg clk;
+    reg a_reset_l;
+    reg irq0;
+    reg irq1;
+    reg instruction_done;
+    reg [63:0] interrupt_return_pc;
+    reg mstatus_mie;
+    reg [63:0] mepc;
+    reg is_mret;
+
+    wire irq0_ack;
+    wire irq1_ack;
+    wire pc_redirect;
+    wire [63:0] pc_redirect_target;
+    wire trap_mepc_we;
+    wire [63:0] trap_mepc;
+    wire trap_mcause_we;
+    wire [63:0] trap_mcause;
+    wire mie_clear;
+    wire [63:0] mie_restore;
+
+    localparam [63:0] IRQ0_HANDLER = 64'h0000000000000000;
+    localparam [63:0] IRQ1_HANDLER = 64'h0000000000000004;
+    localparam [63:0] MCAUSE_IRQ0 = 64'h8000000000000000;
+    localparam [63:0] MCAUSE_IRQ1 = 64'h8000000000000001;
+
+    integer errors = 0;
+
+    interrupt_control interrupt_control_i (
+        .clk(clk),
+        .a_reset_l(a_reset_l),
+        .irq0(irq0),
+        .irq1(irq1),
+        .instruction_done(instruction_done),
+        .interrupt_return_pc(interrupt_return_pc),
+        .mstatus_mie(mstatus_mie),
+        .mepc(mepc),
+        .is_mret(is_mret),
+        .irq0_ack(irq0_ack),
+        .irq1_ack(irq1_ack),
+        .pc_redirect(pc_redirect),
+        .pc_redirect_target(pc_redirect_target),
+        .trap_mepc_we(trap_mepc_we),
+        .trap_mepc(trap_mepc),
+        .trap_mcause_we(trap_mcause_we),
+        .trap_mcause(trap_mcause),
+        .mie_clear(mie_clear),
+        .mie_restore(mie_restore)
+    );
+
+    task chk1;
+        input actual, expected;
+        input [255:0] msg;
+        begin
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=%0d got=%0d",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end else
+                $display("PASS %0s: value=%0d", msg, actual);
+        end
+    endtask
+
+    task chk64;
+        input [63:0] actual, expected;
+        input [255:0] msg;
+        begin
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=0x%016h got=0x%016h",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end else
+                $display("PASS %0s: value=0x%016h",
+                         msg, actual);
+        end
+    endtask
+
+    ////////////////////////////////////////////////
+    /// Template for clk and reset generation  ///
+    /// uncomment it when needed               ///
+    ////////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end
+
+    ////////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
