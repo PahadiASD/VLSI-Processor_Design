@@ -1,0 +1,92 @@
+
+`timescale 1ns/10ps
+
+module tb_csr_control (
+);
+
+    reg clk;
+    reg a_reset_l;
+    reg csr_en;
+    reg [1:0] decoded_csr_op;
+    reg csr_imm;
+    reg [63:0] rs1_data;
+    reg [4:0] rs1_addr;
+    reg [4:0] zimm;
+    reg csr_addr_valid;
+    reg csr_read_only;
+
+    wire csr_access;
+    wire [1:0] csr_op;
+    wire [63:0] csr_wdata;
+    wire csr_write_en;
+    wire csr_ctrl_illegal;
+
+    localparam [1:0] CSR_WRITE = 2'b00;
+    localparam [1:0] CSR_SET   = 2'b01;
+    localparam [1:0] CSR_CLEAR = 2'b10;
+
+    integer errors = 0;
+
+    csr_control csr_control_i (
+        .csr_en (csr_en),
+        .decoded_csr_op (decoded_csr_op),
+        .csr_imm (csr_imm),
+        .rs1_data (rs1_data),
+        .rs1_addr (rs1_addr),
+        .zimm (zimm),
+        .csr_addr_valid (csr_addr_valid),
+        .csr_read_only (csr_read_only),
+        .csr_access (csr_access),
+        .csr_op (csr_op),
+        .csr_wdata (csr_wdata),
+        .csr_write_en (csr_write_en),
+        .csr_ctrl_illegal (csr_ctrl_illegal)
+    );
+
+    task check;
+        input [63:0] exp_wdata;
+        input [1:0] exp_op;
+        input exp_we;
+        input exp_illegal;
+        input [255:0] msg;
+        begin
+            #1;
+            if ((csr_wdata !== exp_wdata) ||
+                (csr_op !== exp_op) ||
+                (csr_write_en !== exp_we) ||
+                (csr_ctrl_illegal !== exp_illegal))
+            begin
+                $display("FAIL %0s: expected wdata=0x%016h op=%0d we=%0d illegal=%0d | got wdata=0x%016h op=%0d we=%0d illegal=%0d",
+                         msg, exp_wdata, exp_op, exp_we, exp_illegal,
+                         csr_wdata, csr_op, csr_write_en, csr_ctrl_illegal);
+
+                errors = errors + 1;
+            end else begin
+                $display("PASS %0s: wdata=0x%016h op=%0d we=%0d illegal=%0d",
+                         msg, csr_wdata, csr_op, csr_write_en, csr_ctrl_illegal);
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////////
+    // Template for clk and reset generation
+    // uncomment it when needed
+    ///////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end
+
+    ///////////////////////////////////////////////
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
