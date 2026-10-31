@@ -1,0 +1,318 @@
+
+// testcase.v
+// RV64 Load Store Unit Testbench
+
+initial begin
+    address   = 64'h0;
+    rs2_data  = 64'h0;
+    mem_rdata = 64'h0;
+    lsu_op    = LSU_LB;
+
+    #1;
+
+    // Load test data
+    mem_rdata = 64'h8877665544332211;
+
+    // LB signed byte load
+    address = 64'd0;
+    lsu_op = LSU_LB;
+    #1;
+    check64(load_result, 64'h0000000000000011,
+            "LB offset0 = 0x11 positive");
+
+    address = 64'd2;
+    lsu_op = LSU_LB;
+    #1;
+    check64(load_result, 64'h0000000000000033,
+            "LB offset2 = 0x33 positive");
+
+    address = 64'd7;
+    lsu_op = LSU_LB;
+    #1;
+    check64(load_result, 64'hFFFFFFFFFFFFFF88,
+            "LB offset7 = 0x88 sign extended");
+
+    // LBU unsigned byte load
+    address = 64'd7;
+    lsu_op = LSU_LBU;
+    #1;
+    check64(load_result, 64'h0000000000000088,
+            "LBU offset7 = 0x88 zero extended");
+
+    // LH signed halfword
+    address = 64'd0;
+    lsu_op = LSU_LH;
+    #1;
+    check64(load_result, 64'h0000000000002211,
+            "LH offset0 = 0x2211 positive");
+
+    address = 64'd6;
+    lsu_op = LSU_LH;
+    #1;
+    check64(load_result, 64'hFFFFFFFFFFFF8877,
+            "LH offset6 = 0x8877 sign extended");
+
+    // LHU unsigned halfword
+    address = 64'd6;
+    lsu_op = LSU_LHU;
+    #1;
+    check64(load_result, 64'h0000000000008877,
+            "LHU offset6 = 0x8877 zero extended");
+
+    // LW signed 32-bit word
+    address = 64'd0;
+    lsu_op = LSU_LW;
+    #1;
+    check64(load_result, 64'h0000000044332211,
+            "LW offset0 = 0x44332211 positive");
+
+    address = 64'd4;
+    lsu_op = LSU_LW;
+    #1;
+    check64(load_result, 64'hFFFFFFFF88776655,
+            "LW offset4 = 0x88776655 sign extended");
+
+    // LWU unsigned 32-bit word
+    address = 64'd4;
+    lsu_op = LSU_LWU;
+    #1;
+    check64(load_result, 64'h0000000088776655,
+            "LWU offset4 = 0x88776655 zero extended");
+
+    // LD full 64-bit doubleword
+    address = 64'd0;
+    lsu_op = LSU_LD;
+    #1;
+    check64(load_result, 64'h8877665544332211,
+            "LD offset0 = complete 64-bit word");
+
+    // Additional signed load edge cases
+    mem_rdata = 64'h0000000000000080;
+    address = 64'd0;
+    lsu_op = LSU_LB;
+    #1;
+    check64(load_result, 64'hFFFFFFFFFFFFFF80,
+            "LB 0x80 sign extends");
+
+    mem_rdata = 64'h0000000000008000;
+    address = 64'd0;
+    lsu_op = LSU_LH;
+    #1;
+    check64(load_result, 64'hFFFFFFFFFFFF8000,
+            "LH 0x8000 sign extends");
+
+    mem_rdata = 64'h0000000080000000;
+    address = 64'd0;
+    lsu_op = LSU_LW;
+    #1;
+    check64(load_result, 64'hFFFFFFFF80000000,
+            "LW 0x80000000 sign extends");
+
+    // STORE BYTE - SB
+    rs2_data = 64'h00000000000000AB;
+    address = 64'd3;
+    lsu_op = LSU_SB;
+    #1;
+    check64(mem_wdata, 64'h00000000AB000000,
+            "SB offset3 places AB in byte 3");
+    #1;
+    check8(mem_byte_en, 8'b00001000,
+           "SB offset3 byte enable");
+
+    // STORE HALFWORD - SH
+    rs2_data = 64'h000000000000CDEF;
+    address = 64'd2;
+    lsu_op = LSU_SH;
+    #1;
+    check64(mem_wdata, 64'h00000000CDEF0000,
+            "SH offset2 places CDEF in bytes 2-3");
+    #1;
+    check8(mem_byte_en, 8'b00001100,
+           "SH offset2 byte enable");
+
+    // STORE WORD - SW, lower half
+    rs2_data = 64'h0000000012345678;
+    address = 64'd0;
+    lsu_op = LSU_SW;
+    #1;
+    check64(mem_wdata, 64'h0000000012345678,
+            "SW offset0 places word in bits 31:0");
+    #1;
+    check8(mem_byte_en, 8'b00001111,
+           "SW offset0 byte enable");
+
+    // STORE WORD - SW, upper half
+    rs2_data = 64'h0000000012345678;
+    address = 64'd4;
+    lsu_op = LSU_SW;
+    #1;
+    check64(mem_wdata, 64'h1234567800000000,
+            "SW offset4 places word in bits 63:32");
+    #1;
+    check8(mem_byte_en, 8'b11110000,
+           "SW offset4 byte enable");
+
+    // STORE DOUBLEWORD - SD
+    rs2_data = 64'hCAFEBABEDEADBEEF;
+    address = 64'd0;
+    lsu_op = LSU_SD;
+    #1;
+    check64(mem_wdata, 64'hCAFEBABEDEADBEEF,
+            "SD writes complete 64-bit value");
+    #1;
+    check8(mem_byte_en, 8'b11111111,
+           "SD enables all 8 bytes");
+
+    // Misalignment LH
+    address = 64'd1;
+    lsu_op = LSU_LH;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL LH address 1 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LH address 1 correctly flagged misaligned");
+    end
+
+    address = 64'd0;
+    lsu_op = LSU_LH;
+    #1;
+
+    if (misaligned !== 1'b0) begin
+        $display("FAIL LH address 0 should be aligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LH address 0 correctly aligned");
+    end
+
+    // Misalignment LW
+    address = 64'd2;
+    lsu_op = LSU_LW;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL LW address 2 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LW address 2 correctly flagged misaligned");
+    end
+
+    address = 64'd4;
+    lsu_op = LSU_LW;
+    #1;
+
+    if (misaligned !== 1'b0) begin
+        $display("FAIL LW address 4 should be aligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LW address 4 correctly aligned");
+    end
+
+    // Misalignment LD
+    address = 64'd4;
+    lsu_op = LSU_LD;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL LD address 4 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LD address 4 correctly flagged misaligned");
+    end
+
+    address = 64'd0;
+    lsu_op = LSU_LD;
+    #1;
+
+    if (misaligned !== 1'b0) begin
+        $display("FAIL LD address 0 should be aligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS LD address 0 correctly aligned");
+    end
+
+    // Misalignment SH
+    address = 64'd1;
+    rs2_data = 64'h1234;
+    lsu_op = LSU_SH;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL SH address 1 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS SH address 1 correctly flagged misaligned");
+    end
+
+    // Misalignment SW
+    address = 64'd2;
+    rs2_data = 64'h12345678;
+    lsu_op = LSU_SW;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL SW address 2 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS SW address 2 correctly flagged misaligned");
+    end
+
+    // Misalignment SD
+    address = 64'd4;
+    rs2_data = 64'hCAFEBABEDEADBEEF;
+    lsu_op = LSU_SD;
+    #1;
+
+    if (misaligned !== 1'b1) begin
+        $display("FAIL SD address 4 should be misaligned");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS SD address 4 correctly flagged misaligned");
+    end
+
+    // Check memory read
+    mem_rdata = 64'h1122334455667788;
+    address = 64'd0;
+    lsu_op = LSU_LD;
+    #1;
+
+    if (mem_read !== 1'b1) begin
+        $display("FAIL load operation should assert mem_read");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS load operation asserts mem_read");
+    end
+
+    // Check memory write
+    rs2_data = 64'h123456789ABCDEF0;
+    address = 64'd0;
+    lsu_op = LSU_SD;
+    #1;
+
+    if (mem_write !== 1'b1) begin
+        $display("FAIL store operation should assert mem_write");
+        errors = errors + 1;
+    end
+    else begin
+        $display("PASS store operation asserts mem_write");
+    end
+
+    // Summary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
