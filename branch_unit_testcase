@@ -1,0 +1,146 @@
+
+/*
+ * Filename: testcase.v
+ * Project: RISC-V Core
+ * Description: Branch Unit Test Cases
+ */
+
+// Fill in testcase specific pattern generation
+initial begin
+
+    // BEQ
+    rs1_data = 64'd5;
+    rs2_data = 64'd5;
+    branch_op = BR_BEQ;
+    check_taken(1'b1, "BEQ 5==5 -> taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd6;
+    branch_op = BR_BEQ;
+    check_taken(1'b0, "BEQ 5==6 -> not taken");
+
+    // BNE
+    rs1_data = 64'd5;
+    rs2_data = 64'd6;
+    branch_op = BR_BNE;
+    check_taken(1'b1, "BNE 5!=6 -> taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd5;
+    branch_op = BR_BNE;
+    check_taken(1'b0, "BNE 5!=5 -> not taken");
+
+    // BLT signed comparison
+    rs1_data = 64'd5;
+    rs2_data = 64'd10;
+    branch_op = BR_BLT;
+    check_taken(1'b1, "BLT 5<10 -> taken");
+
+    rs1_data = 64'd10;
+    rs2_data = 64'd5;
+    branch_op = BR_BLT;
+    check_taken(1'b0, "BLT 10<5 -> not taken");
+
+    rs1_data = -64'd1;
+    rs2_data = 64'd1;
+    branch_op = BR_BLT;
+    check_taken(1'b1, "BLT -1<1 signed -> taken");
+
+    rs1_data = 64'd1;
+    rs2_data = -64'd1;
+    branch_op = BR_BLT;
+    check_taken(1'b0, "BLT 1<-1 signed -> not taken");
+
+    // BGE
+    rs1_data = 64'd10;
+    rs2_data = 64'd5;
+    branch_op = BR_BGE;
+    check_taken(1'b1, "BGE 10>=5 -> taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd10;
+    branch_op = BR_BGE;
+    check_taken(1'b0, "BGE 5>=10 -> not taken");
+
+    rs1_data = -64'd1;
+    rs2_data = 64'd1;
+    branch_op = BR_BGE;
+    check_taken(1'b0, "BGE -1>=1 signed -> not taken");
+
+    rs1_data = 64'd1;
+    rs2_data = -64'd1;
+    branch_op = BR_BGE;
+    check_taken(1'b1, "BGE 1>=-1 signed -> taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd5;
+    branch_op = BR_BGE;
+    check_taken(1'b1, "BGE 5>=5 -> taken");
+
+    // BLTU unsigned comparison
+    rs1_data = 64'd5;
+    rs2_data = 64'd10;
+    branch_op = BR_BLTU;
+    check_taken(1'b1, "BLTU 5<10 -> taken");
+
+    rs1_data = 64'd10;
+    rs2_data = 64'd5;
+    branch_op = BR_BLTU;
+    check_taken(1'b0, "BLTU 10<5 -> not taken");
+
+    // 0xFFFFFFFFFFFFFFFF is very large when interpreted unsigned
+    rs1_data = 64'hFFFFFFFFFFFFFFFF;
+    rs2_data = 64'h0000000000000001;
+    branch_op = BR_BLTU;
+    check_taken(1'b0, "BLTU FFFF....FFFF<1 unsigned -> not taken");
+
+    rs1_data = 64'h0000000000000001;
+    rs2_data = 64'hFFFFFFFFFFFFFFFF;
+    branch_op = BR_BLTU;
+    check_taken(1'b1, "BLTU 1<FFFF....FFFF unsigned -> taken");
+
+    // BGEU unsigned comparison
+    rs1_data = 64'd10;
+    rs2_data = 64'd5;
+    branch_op = BR_BGEU;
+    check_taken(1'b1, "BGEU 10>=5 -> taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd10;
+    branch_op = BR_BGEU;
+    check_taken(1'b0, "BGEU 5>=10 -> not taken");
+
+    rs1_data = 64'hFFFFFFFFFFFFFFFF;
+    rs2_data = 64'h0000000000000001;
+    branch_op = BR_BGEU;
+    check_taken(1'b1, "BGEU FFFF....FFFF>=1 unsigned -> taken");
+
+    rs1_data = 64'h0000000000000001;
+    rs2_data = 64'hFFFFFFFFFFFFFFFF;
+    branch_op = BR_BGEU;
+    check_taken(1'b0, "BGEU 1>=FFFF....FFFF unsigned -> not taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd5;
+    branch_op = BR_BGEU;
+    check_taken(1'b1, "BGEU 5>=5 -> taken");
+
+    // Invalid - unused branch
+    rs1_data = 64'd5;
+    rs2_data = 64'd5;
+    branch_op = 3'b110;
+    check_taken(1'b0, "Invalid branch_op 110 -> not taken");
+
+    rs1_data = 64'd5;
+    rs2_data = 64'd10;
+    branch_op = 3'b111;
+    check_taken(1'b0, "Invalid branch_op 111 -> not taken");
+
+    // Summary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TESTS FAILED ***\n", errors);
+
+    $finish();
+end
