@@ -1,0 +1,39 @@
+
+`timescale 1ns/10ps
+
+module branch_unit (
+    input wire [63:0] rs1_data,
+    input wire [63:0] rs2_data,
+    input wire [2:0] branch_op,
+
+    output reg branch_taken
+);
+
+    // branch_op encoding
+    localparam BR_BEQ  = 3'b000;
+    localparam BR_BNE  = 3'b001;
+    localparam BR_BLT  = 3'b010;
+    localparam BR_BGE  = 3'b011;
+    localparam BR_BLTU = 3'b100;
+    localparam BR_BGEU = 3'b101;
+
+    // Signed view of the operands, used only for BLT/BGE
+    wire signed [63:0] rs1_data_signed = rs1_data;
+    wire signed [63:0] rs2_data_signed = rs2_data;
+
+    always @* begin
+        case (branch_op)
+            BR_BEQ:  branch_taken = (rs1_data == rs2_data);
+            BR_BNE:  branch_taken = (rs1_data != rs2_data);
+
+            BR_BLT:  branch_taken = (rs1_data_signed < rs2_data_signed);
+            BR_BGE:  branch_taken = (rs1_data_signed >= rs2_data_signed);
+
+            BR_BLTU: branch_taken = (rs1_data < rs2_data);
+            BR_BGEU: branch_taken = (rs1_data >= rs2_data);
+
+            default: branch_taken = 1'b0; // avoid inferred latch
+        endcase
+    end
+
+endmodule
