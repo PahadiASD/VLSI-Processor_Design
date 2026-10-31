@@ -1,0 +1,129 @@
+
+`timescale 1ns/10ps
+
+module lsu (
+    input wire [63:0] address,    //effective address: rs1_data+imm, computed externally
+    input wire [63:0] rs2_data,   //store source data
+    input wire [63:0] mem_rdata,  //64 bit word read from memory at the aligned address
+    input wire [3:0] lsu_op,
+
+    output reg [63:0] mem_wdata,  //formatted write data, aligned into the correct byte lane
+    output reg [7:0] mem_byte_en, //one bit per byte lane
+    output reg [63:0] load_result, //formatted load result
+    output reg misaligned,
+    output reg mem_read,
+    output reg mem_write
+);
+
+    //lsu op encoding
+    localparam LSU_LB  = 4'd0;
+    localparam LSU_LH  = 4'd1;
+    localparam LSU_LW  = 4'd2;
+    localparam LSU_LD  = 4'd3;
+    localparam LSU_LBU = 4'd4;
+    localparam LSU_LHU = 4'd5;
+    localparam LSU_LWU = 4'd6;
+    localparam LSU_SB  = 4'd7;
+    localparam LSU_SH  = 4'd8;
+    localparam LSU_SW  = 4'd9;
+    localparam LSU_SD  = 4'd10;
+
+    //Byte offset within the 64 bit memory word
+    wire [2:0] byte_offset = address[2:0];
+    wire [63:0] shifted_rdata = mem_rdata >> (byte_offset * 8);
+
+    wire [7:0]  sel_byte = shifted_rdata[7:0];
+    wire [15:0] sel_half = shifted_rdata[15:0];
+    wire [31:0] sel_word = shifted_rdata[31:0];
+
+    wire [63:0] wdata_shifted = rs2_data << (byte_offset * 8);
+
+    always @* begin
+        //default assignments - avoid inferred latches on every path
+
+        mem_wdata    = 64'h0;
+        mem_byte_en  = 8'h0;
+        load_result  = 64'h0;
+        misaligned   = 1'b0;
+        mem_read     = 1'b0;
+        mem_write    = 1'b0;
+
+        case (lsu_op)
+
+            //loads
+            LSU_LB: begin
+                mem_read = 1'b1;
+                load_result = {{56{sel_byte[7]}}, sel_byte};
+            end
+
+            LSU_LBU: begin
+                mem_read = 1'b1;
+                load_result = {56'h0, sel_byte};
+            end
+
+            LSU_LH: begin
+                mem_read = 1'b1;
+                misaligned = (address[0] != 1'b0);
+                load_result = {{48{sel_half[15]}}, sel_half};
+            end
+
+            LSU_LHU: begin
+                mem_read = 1'b1;
+                misaligned = (address[0] != 1'b0);
+                load_result = {48'h0, sel_half};
+            end
+
+            LSU_LW: begin
+                mem_read = 1'b1;
+                misaligned = (address[1:0] != 2'b00);
+                load_result = {{32{sel_word[31]}}, sel_word};
+            end
+
+            LSU_LWU: begin
+                mem_read = 1'b1;
+                misaligned = (address[1:0] != 2'b00);
+                load_result = {32'h0, sel_word};
+            end
+
+            LSU_LD: begin
+                mem_read = 1'b1;
+                misaligned = (address[2:0] != 3'b000);
+                load_result = mem_rdata;
+            end
+
+
+            //stores
+            LSU_SB: begin
+                mem_write = 1'b1;
+                mem_wdata = wdata_shifted;
+                mem_byte_en = 8'b00000001 << byte_offset;
+            end
+
+            LSU_SH: begin
+                mem_write = 1'b1;
+                misaligned = (address[0] != 1'b0);
+                mem_wdata = wdata_shifted;
+                mem_byte_en = 8'b00000011 << byte_offset;
+            end
+
+            LSU_SW: begin
+                mem_write = 1'b1;
+                misaligned = (address[1:0] != 2'b00);
+                mem_wdata = wdata_shifted;
+                mem_byte_en = 8'b00001111 << byte_offset;
+            end
+
+            LSU_SD: begin
+                mem_write = 1'b1;
+                misaligned = (address[2:0] != 3'b000);
+                mem_wdata = rs2_data;
+                mem_byte_en = 8'b11111111;
+            end
+
+            default: begin
+            end
+
+        endcase
+    end
+
+endmodule
