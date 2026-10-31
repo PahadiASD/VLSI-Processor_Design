@@ -1,0 +1,247 @@
+
+/*
+ * Filename: testcase.v
+ * Project: RISC-V Core
+ * Description: CSR Control Unit Test Cases
+ */
+
+// Fill in testcase specific pattern generation
+initial begin
+
+    csr_en = 1'b0;
+    decoded_csr_op = CSR_WRITE;
+    csr_imm = 1'b0;
+    rs1_data = 64'h0;
+    rs1_addr = 5'd0;
+    zimm = 5'd0;
+    csr_addr_valid = 1'b1;
+    csr_read_only = 1'b0;
+    #1;
+
+    // TEST 1: Non-CSR instruction / idle
+    csr_en = 1'b0;
+    #1;
+
+    if (csr_access !== 1'b0) begin
+        $display("FAIL IDLE csr_access: expected=0 got=%0d", csr_access);
+        errors = errors + 1;
+    end else
+        $display("PASS IDLE csr_access: value=%0d", csr_access);
+
+    if (csr_write_en !== 1'b0) begin
+        $display("FAIL IDLE csr_write_en: expected=0 got=%0d", csr_write_en);
+        errors = errors + 1;
+    end else
+        $display("PASS IDLE csr_write_en: value=%0d", csr_write_en);
+
+
+    // TEST 2: CSRRW normal source
+    csr_en = 1'b1;
+    csr_imm = 1'b0;
+    decoded_csr_op = CSR_WRITE;
+    rs1_data = 64'h123456789ABCDEF0;
+    rs1_addr = 5'd7;
+    csr_addr_valid = 1'b1;
+    csr_read_only = 1'b0;
+
+    check(64'h123456789ABCDEF0, CSR_WRITE, 1'b1, 1'b0,
+          "CSRRW normal source");
+
+
+    // TEST 3: CSRRW with rs1=x0, still writes
+    rs1_data = 64'h0;
+    rs1_addr = 5'd0;
+
+    check(64'h0, CSR_WRITE, 1'b1, 1'b0,
+          "CSRRW rs1=x0 still writes");
+
+
+    // TEST 4: CSRRS normal source
+    decoded_csr_op = CSR_SET;
+    csr_imm = 1'b0;
+    rs1_data = 64'hDEADBEEFDEADBEEF;
+    rs1_addr = 5'd3;
+    csr_addr_valid = 1'b1;
+    csr_read_only = 1'b0;
+
+    check(64'hDEADBEEFDEADBEEF, CSR_SET, 1'b1, 1'b0,
+          "CSRRS normal source");
+
+
+    // TEST 5: CSRRS with rs1=x0
+    rs1_addr = 5'd0;
+    csr_addr_valid = 1'b1;
+    csr_read_only = 1'b0;
+
+    check(64'hDEADBEEFDEADBEEF, CSR_SET, 1'b0, 1'b0,
+          "CSRRS rs1=x0 write suppressed");
+
+
+    // TEST 6: CSRRC normal source
+    decoded_csr_op = CSR_CLEAR;
+    csr_imm = 1'b0;
+    rs1_data = 64'hFF00FF00FF00FF00;
+    rs1_addr = 5'd9;
+
+    check(64'hFF00FF00FF00FF00, CSR_CLEAR, 1'b1, 1'b0,
+          "CSRRC normal source");
+
+
+    // TEST 7: CSRRC with rs1=x0
+    rs1_addr = 5'd0;
+
+    check(64'hFF00FF00FF00FF00, CSR_CLEAR, 1'b0, 1'b0,
+          "CSRRC rs1=x0 no write");
+
+
+    // TEST 8: CSRRWI with nonzero zimm
+    csr_imm = 1'b1;
+    decoded_csr_op = CSR_WRITE;
+    zimm = 5'b10101;
+
+    check(64'h15, CSR_WRITE, 1'b1, 1'b0,
+          "CSRRWI zimm=0x15");
+
+
+    // TEST 9: CSRRWI with zimm=0
+    zimm = 5'd0;
+
+    check(64'h0, CSR_WRITE, 1'b1, 1'b0,
+          "CSRRWI zimm=0 writes");
+
+
+    // TEST 10: CSRRSI with nonzero zimm
+    decoded_csr_op = CSR_SET;
+    zimm = 5'd5;
+
+    check(64'h5, CSR_SET, 1'b1, 1'b0,
+          "CSRRSI zimm=5");
+
+
+    // TEST 11: CSRRSI with zimm=0
+    zimm = 5'd0;
+
+    check(64'h0, CSR_SET, 1'b0, 1'b0,
+          "CSRRSI zimm=0 no write");
+
+
+    // TEST 12: CSRRCI with nonzero zimm
+    decoded_csr_op = CSR_CLEAR;
+    zimm = 5'd12;
+
+    check(64'hC, CSR_CLEAR, 1'b1, 1'b0,
+          "CSRRCI zimm=12");
+
+
+    // TEST 13: CSRRCI with zimm=0
+    zimm = 5'd0;
+
+    check(64'h0, CSR_CLEAR, 1'b0, 1'b0,
+          "CSRRCI zimm=0 no write");
+
+
+    // TEST 14: CSRRS on read-only CSR with rs1=x0
+    csr_read_only = 1'b1;
+    csr_imm = 1'b0;
+    decoded_csr_op = CSR_SET;
+    rs1_addr = 5'd0;
+    rs1_data = 64'h000000000000ABAB;
+    zimm = 5'd12;
+
+    check(64'h000000000000ABAB, CSR_SET, 1'b0, 1'b0,
+          "CSRRS read-only CSR rs1=x0");
+
+
+    // TEST 15: CSRRC on read-only CSR with rs1=x0
+    decoded_csr_op = CSR_CLEAR;
+    rs1_addr = 5'd0;
+
+    check(64'hABAB, CSR_CLEAR, 1'b0, 1'b0,
+          "CSRRC RO rs1=x0");
+
+
+    // TEST 16: CSRRSI on read-only CSR with zimm=0
+    csr_imm = 1'b1;
+    decoded_csr_op = CSR_SET;
+    zimm = 5'd0;
+
+    check(64'h0, CSR_SET, 1'b0, 1'b0,
+          "CSRRSI RO zimm=0");
+
+
+    // TEST 17: CSRRCI on read-only CSR with zimm=0
+    decoded_csr_op = CSR_CLEAR;
+    zimm = 5'd0;
+
+    check(64'h0, CSR_CLEAR, 1'b0, 1'b0,
+          "CSRRCI read-only CSR zimm=0");
+
+
+    // TEST 18: CSRRW write attempt on read-only CSR
+    csr_imm = 1'b0;
+    decoded_csr_op = CSR_WRITE;
+    rs1_addr = 5'd5;
+    rs1_data = 64'h1;
+
+    check(64'h1, CSR_WRITE, 1'b0, 1'b1,
+          "CSRRW RO illegal");
+
+
+    // TEST 19: CSRRS write attempt on read-only CSR
+    decoded_csr_op = CSR_SET;
+    rs1_addr = 5'd5;
+    rs1_data = 64'h55;
+
+    check(64'h55, CSR_SET, 1'b0, 1'b1,
+          "CSRRS RO illegal");
+
+
+    // TEST 20: CSRRSI write attempt on read-only CSR
+    csr_imm = 1'b1;
+    zimm = 5'd3;
+    decoded_csr_op = CSR_SET;
+    rs1_addr = 5'd1;
+    rs1_data = 64'h1;
+
+    check(64'h3, CSR_SET, 1'b0, 1'b1,
+          "CSRRSI RO illegal");
+
+
+    // TEST 21: Unsupported CSR
+    csr_read_only = 1'b0;
+    csr_addr_valid = 1'b0;
+    csr_imm = 1'b0;
+    decoded_csr_op = CSR_WRITE;
+    rs1_addr = 5'd1;
+    rs1_data = 64'h1;
+
+    check(64'h1, CSR_WRITE, 1'b0, 1'b1,
+          "Unsupported CSR");
+
+
+    // TEST 22: csr_en=0
+    csr_addr_valid = 1'b1;
+    csr_en = 1'b0;
+    #1;
+
+    if (csr_access !== 1'b0) begin
+        $display("FAIL csr_en=0: expected csr_access=0 got=%0d", csr_access);
+        errors = errors + 1;
+    end else
+        $display("PASS csr_en=0: csr_access=0");
+
+    if (csr_write_en !== 1'b0) begin
+        $display("FAIL csr_en=0: expected csr_write_en=0 got=%0d", csr_write_en);
+        errors = errors + 1;
+    end else
+        $display("PASS csr_en=0: csr_write_en=0");
+
+
+    // Summary
+    if (errors == 0)
+        $display("\n*** ALL CSR_CONTROL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d CSR_CONTROL TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
