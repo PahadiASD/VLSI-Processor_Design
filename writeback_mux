@@ -1,0 +1,34 @@
+
+`timescale 1ns/10ps
+
+module writeback_mux (
+    input wire [63:0] alu_result,
+    input wire [63:0] muldiv_result,
+    input wire [63:0] load_result,
+    input wire [63:0] pc_return,
+    input wire [63:0] csr_result,
+
+    input wire [2:0] wb_sel,
+
+    output reg [63:0] wb_data
+);
+
+    // wb_sel encoding
+    localparam WB_ALU    = 3'd0;
+    localparam WB_MULDIV = 3'd1;
+    localparam WB_LOAD   = 3'd2;
+    localparam WB_PC     = 3'd3;
+    localparam WB_CSR    = 3'd4;
+
+    always @* begin
+        case (wb_sel)
+            WB_ALU:    wb_data = alu_result;
+            WB_MULDIV: wb_data = muldiv_result;
+            WB_LOAD:   wb_data = load_result;
+            WB_PC:     wb_data = pc_return;
+            WB_CSR:    wb_data = csr_result;
+            default:   wb_data = 64'h0;
+        endcase
+    end
+
+endmodule
