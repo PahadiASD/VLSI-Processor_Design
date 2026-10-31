@@ -1,0 +1,108 @@
+
+`timescale 1ns/10ps
+
+module tb_lsu ();
+
+    reg clk;
+    reg a_reset_1;
+
+    reg [63:0] address, rs2_data, mem_rdata;
+    reg [3:0] lsu_op;
+
+    wire [63:0] mem_wdata;
+    wire [7:0] mem_byte_en;
+    wire [63:0] load_result;
+    wire misaligned;
+    wire mem_read;
+    wire mem_write;
+
+    localparam LSU_LB  = 4'd0;
+    localparam LSU_LH  = 4'd1;
+    localparam LSU_LW  = 4'd2;
+    localparam LSU_LD  = 4'd3;
+    localparam LSU_LBU = 4'd4;
+    localparam LSU_LHU = 4'd5;
+    localparam LSU_LWU = 4'd6;
+    localparam LSU_SB  = 4'd7;
+    localparam LSU_SH  = 4'd8;
+    localparam LSU_SW  = 4'd9;
+    localparam LSU_SD  = 4'd10;
+
+    integer errors = 0;
+
+    lsu lsu_i (
+        .address     (address),
+        .rs2_data    (rs2_data),
+        .mem_rdata   (mem_rdata),
+        .lsu_op      (lsu_op),
+        .mem_wdata   (mem_wdata),
+        .mem_byte_en (mem_byte_en),
+        .load_result (load_result),
+        .misaligned  (misaligned),
+        .mem_read    (mem_read),
+        .mem_write   (mem_write)
+    );
+
+    task check64;
+        input [63:0] actual;
+        input [63:0] expected;
+        input [127:0] msg;
+
+        begin
+            #1;
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=0x%016h got=0x%016h",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS %0s: value=0x%016h",
+                         msg, actual);
+            end
+        end
+    endtask
+
+    task check8;
+        input [7:0] actual;
+        input [7:0] expected;
+        input [127:0] msg;
+
+        begin
+            #1;
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=0x%08b got=0x%08b",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS %0s: value=0x%08b",
+                         msg, actual);
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////
+    /// Template for clk and reset generation
+    /// uncomment it when needed
+    ///////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_1 = 1'b0;
+        #33
+        a_reset_1 = 1'b1;
+    end
+
+    ///////////////////////////////////////////
+
+    // Template
+    // File has to be situated in
+    // simulation/<simulator_name>/<testcase> directory
+
+    `include "testcase.v"
+
+endmodule
