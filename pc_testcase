@@ -1,0 +1,90 @@
+
+initial begin
+
+    //Test 1: Asynchronous reset
+    a_reset_l = 1'b0;
+    pc_write = 1'b0;
+    next_pc = 64'hFFFF_FFFF_FFFF_FFFF; //should be ignored
+
+    #1;
+    check_pc(64'h0000000000000008, "async reset (no clk edge yet)");
+
+    // Test 2: keep reset active through a clock edge
+    @(posedge clk);
+    #1;
+
+    check_pc(64'h0000000000000008, "reset held through clk edge");
+
+    //Release reset
+    @(negedge clk);
+    a_reset_l = 1'b1;
+
+
+    //TEST 3: Normal pc update
+    pc_write = 1'b1;
+    next_pc = 64'h000000000000000C;
+
+    @(posedge clk);
+    #1;
+
+    check_pc(64'h000000000000000C, "Normal sequential update");
+
+    //Second update
+    next_pc = 64'h0000000000000010;
+
+    @(posedge clk);
+    #1;
+
+    check_pc(64'h0000000000000010, "second sequential update");
+
+
+    //TEst 4:pc_write = 0, PC must hold its old value
+    pc_write = 1'b0;
+    next_pc = 64'h0000000000000020;
+
+    @(posedge clk);
+    #1;
+
+    check_pc(64'h0000000000000010, "holding PC when pc_write =0");
+
+    //check another clock cycle
+    next_pc = 64'h0000000000000010;
+
+    @(posedge clk);
+    #1;
+
+    check_pc(64'h0000000000000010, "still holding on second stage");
+
+
+    //TEst 5: arbitrary branch/ jump target
+    pc_write = 1'b1;
+    next_pc = 64'hFFFFFFFF80000000;
+
+    @(posedge clk);
+    #1;
+
+    check_pc(64'hFFFFFFFF80000000, "arbitrary branch/ jump target load");
+
+
+    //Test 6: asynchronous reset in middle of operation
+    #2;
+    a_reset_l = 1'b0;
+
+    #1;
+
+    check_pc(64'h0000000000000008, "mid cycle async reset reasserted");
+
+    a_reset_l = 1'b1;
+
+    #1;
+
+
+    //test summary
+    if (errors == 0)
+        $display("\n*** ALL TEST PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+
+    $finish();
+end
