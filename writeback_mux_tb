@@ -1,0 +1,68 @@
+
+`timescale 1ns/10ps
+
+module tb_writeback_mux ();
+
+    reg clk;
+    reg a_reset_l;
+
+    reg [63:0] alu_result, muldiv_result, load_result, pc_return, csr_result;
+    reg [2:0] wb_sel;
+    wire [63:0] wb_data;
+
+    localparam WB_ALU    = 3'd0;
+    localparam WB_MULDIV = 3'd1;
+    localparam WB_LOAD   = 3'd2;
+    localparam WB_PC     = 3'd3;
+    localparam WB_CSR    = 3'd4;
+    localparam WB_UNUSED = 3'd7;
+
+    integer errors = 0;
+
+    writeback_mux writeback_mux_i (
+        .alu_result (alu_result),
+        .muldiv_result (muldiv_result),
+        .load_result (load_result),
+        .pc_return (pc_return),
+        .csr_result (csr_result),
+        .wb_sel (wb_sel),
+        .wb_data (wb_data)
+    );
+
+    task check_wb;
+        input [63:0] expected;
+        input [127:0] msg;
+        begin
+            #1;
+            if (wb_data !== expected) begin
+                $display("FAIL %0s: expected=0x%016h got=0x%016h",
+                         msg, expected, wb_data);
+                errors = errors+1;
+            end else begin
+                $display("PASS %0s: wb_data=0x%016h", msg, wb_data);
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////////
+    // Template for clk and reset generation
+    // uncomment it when needed
+    ///////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end
+
+    ///////////////////////////////////////////////
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
