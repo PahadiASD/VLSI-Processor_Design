@@ -1,0 +1,64 @@
+
+`timescale 1ns/10ps
+
+module tb_register_file ();
+
+    reg a_reset_l;
+
+    reg clk;
+    reg [4:0] rs1_addr, rs2_addr, rd_addr;
+    reg [63:0] rd_data;
+    reg rd_write;
+    wire [63:0] rs1_data, rs2_data;
+
+    integer errors = 0;
+
+    register_file register_file_i (
+        .clk (clk),
+        .rs1_addr (rs1_addr),
+        .rs2_addr (rs2_addr),
+        .rs1_data (rs1_data),
+        .rs2_data (rs2_data),
+        .rd_addr (rd_addr),
+        .rd_data (rd_data),
+        .rd_write (rd_write)
+    );
+
+    task check64;
+        input [63:0] actual;
+        input [63:0] expected;
+        input [127:0] msg;
+        begin
+            if (actual !== expected) begin
+                $display("FAIL [%0t ns] %0s: expected=0x%016h got=0x%016h",
+                         $time, msg, expected, actual);
+                errors = errors + 1;
+            end else begin
+                $display("PASS [%0t ns] %0s: value=0x%016h",
+                         $time, msg, actual);
+            end
+        end
+    endtask
+
+    ///////////////////////////////////////////////
+    // Template for clk and reset generation
+    // uncomment it when needed
+    ///////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b1;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end
+
+    ///////////////////////////////////////////////
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/[testcase] directory
+    `include "testcase.v"
+
+endmodule
