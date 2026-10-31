@@ -1,0 +1,166 @@
+
+`timescale 1ns/10ps
+
+// Fill in testcase specific pattern generation
+initial begin
+    rd_write = 1'b0;
+    rs1_addr = 5'd0;
+    rs2_addr = 5'd0;
+    rd_addr = 5'd0;
+    rd_data = 64'h0;
+    #1;
+
+    // 1. x0 must always read as zero
+    rs1_addr = 5'd0;
+    #1;
+    check64(rs1_data, 64'h0000000000000000,
+            "read x0 before any writes");
+
+    // Attempting to write x0 must do nothing
+    rd_addr = 5'd0;
+    rd_data = 64'h123456789ABCDEF0;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+    rd_write = 1'b0;
+
+    rs1_addr = 5'd0;
+    #1;
+    check64(rs1_data, 64'h0000000000000000,
+            "x0 unchanged after attempted write");
+
+    // Write x1 and read it back
+    rd_addr = 5'd1;
+    rd_data = 64'hAAAAAAAAAAAAAAAA;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+    rd_write = 1'b0;
+
+    rs1_addr = 5'd1;
+    #1;
+    check64(rs1_data, 64'hAAAAAAAAAAAAAAAA,
+            "read back x1");
+
+    // Write x2 with a different value
+    rd_addr = 5'd2;
+    rd_data = 64'h5555555555555555;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+    rd_write = 1'b0;
+
+    rs2_addr = 5'd2;
+    #1;
+    check64(rs2_data, 64'h5555555555555555,
+            "read back x2");
+
+    // Simultaneous read from x1 and x2
+    rs1_addr = 5'd1;
+    rs2_addr = 5'd2;
+    #1;
+    check64(rs1_data, 64'hAAAAAAAAAAAAAAAA,
+            "simultaneous read x1 via rs1");
+    check64(rs2_data, 64'h5555555555555555,
+            "simultaneous read x2 via rs2");
+
+    // rd_write = 0 must prevent modification
+    rd_addr = 5'd1;
+    rd_data = 64'hDEADDEADDEADDEAD;
+    rd_write = 1'b0;
+
+    @(posedge clk)
+    #1;
+
+    rs1_addr = 5'd1;
+    #1;
+    check64(rs1_data, 64'hAAAAAAAAAAAAAAAA,
+            "x1 unchanged when rd_write = 0");
+
+    // Overwrite an existing register
+    rd_addr = 5'd1;
+    rd_data = 64'h1111222233334444;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+
+    rd_write = 1'b0;
+    rs1_addr = 5'd1;
+
+    #1;
+    check64(rs1_data, 64'h1111222233334444,
+            "overwrite x1");
+
+    // Verify x2 was not affected by writing x1
+    rs2_addr = 5'd2;
+    #1;
+    check64(rs2_data, 64'h5555555555555555,
+            "x2 unchanged after writing x1");
+
+    // Write maximum positive 64-bit value
+    rd_addr = 5'd10;
+    rd_data = 64'h7FFFFFFFFFFFFFFF;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+
+    rd_write = 1'b0;
+    rs1_addr = 5'd10;
+
+    #1;
+    check64(rs1_data, 64'h7FFFFFFFFFFFFFFF,
+            "64-bit value written to x10");
+
+    // Write all ones
+    rd_addr = 5'd20;
+    rd_data = 64'hFFFFFFFFFFFFFFFF;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+
+    rd_write = 1'b0;
+    rs1_addr = 5'd20;
+
+    #1;
+    check64(rs1_data, 64'hFFFFFFFFFFFFFFFF,
+            "all ones written to x20");
+
+    // Write and read x31
+    rd_addr = 5'd31;
+    rd_data = 64'h1122334455667788;
+    rd_write = 1'b1;
+
+    @(posedge clk)
+    #1;
+
+    rd_write = 1'b0;
+    rs2_addr = 5'd31;
+
+    #1;
+    check64(rs2_data, 64'h1122334455667788,
+            "full 64-bit value in x31");
+
+    // x0 must still be zero after all other writes
+    rs1_addr = 5'd0;
+    rs2_addr = 5'd0;
+
+    #1;
+    check64(rs1_data, 64'h0000000000000000,
+            "x0 still zero via rs1");
+    check64(rs2_data, 64'h0000000000000000,
+            "x0 still zero via rs2");
+
+    // Summary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
