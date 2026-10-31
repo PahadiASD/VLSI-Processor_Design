@@ -1,0 +1,27 @@
+
+`timescale 1ns/10ps
+
+module pc (
+    input wire clk,
+    input wire a_reset_l,
+    input wire pc_write,
+    input wire [63:0] next_pc,
+
+    output reg [63:0] pc
+);
+
+localparam [63:0] RESET_PC = 64'h0000000000000008;
+
+always @(posedge clk or negedge a_reset_l) begin
+    if (!a_reset_l) begin
+        pc <= RESET_PC;
+    end
+    else begin
+        if (pc_write) begin
+            pc <= next_pc;
+        end
+        // Otherwise hold the current PC value
+    end
+end
+
+endmodule
