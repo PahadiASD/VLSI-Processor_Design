@@ -1,0 +1,72 @@
+
+`timescale 1ns/10ps
+
+module csr_control (
+    input wire csr_en, // this is one of the 6 I/csr instructions
+    input wire [1:0] decoded_csr_op, // CSR_WRITE, CSR_SET, CSR_CLEAR
+    input wire csr_imm, // 1 = *I form, 0 = register form
+
+    // Register source form
+    input wire [63:0] rs1_data,
+    input wire [4:0] rs1_addr,
+
+    // Immediate source form
+    input wire [4:0] zimm,
+
+    // Address legality, from csr_regs
+    input wire csr_addr_valid,
+    input wire csr_read_only,
+
+    // Output to csr_regs
+    output reg csr_access, // this cycle involves a CSR access at all
+    output reg [1:0] csr_op, // passed straight through to CSR regs
+    output reg [63:0] csr_wdata, // selected source operand
+    output reg csr_write_en, // actual write enable, after suppression
+
+    // Error to main control
+    output reg csr_ctrl_illegal
+);
+
+    localparam [1:0] CSR_WRITE = 2'b00;
+    localparam [1:0] CSR_SET   = 2'b01;
+    localparam [1:0] CSR_CLEAR = 2'b10;
+
+    always @* begin
+        csr_access = 1'b0;
+        csr_op = decoded_csr_op;
+        csr_wdata = 64'h0;
+        csr_write_en = 1'b0;
+        csr_ctrl_illegal = 1'b0;
+
+        if (csr_en) begin
+            csr_access = 1'b1;
+            csr_wdata = csr_imm ? {59'b0, zimm} : rs1_data;
+
+            if (decoded_csr_op == CSR_WRITE) begin
+                csr_write_en = csr_addr_valid;
+            end else begin
+                if (csr_imm)
+                    csr_write_en = csr_addr_valid && (zimm != 5'b0);
+                else
+                    csr_write_en = csr_addr_valid && (rs1_addr != 5'd0);
+            end
+
+            if (!csr_addr_valid) begin
+                csr_ctrl_illegal = 1'b1;
+            end else if (csr_read_only) begin
+                if (decoded_csr_op == CSR_WRITE) begin
+                    csr_ctrl_illegal = 1'b1;
+                end else begin
+                    if (csr_imm)
+                        csr_ctrl_illegal = (zimm != 5'b0);
+                    else
+                        csr_ctrl_illegal = (rs1_addr != 5'd0);
+                end
+            end
+
+            if (csr_ctrl_illegal)
+                csr_write_en = 1'b0;
+        end
+    end
+
+endmodule
