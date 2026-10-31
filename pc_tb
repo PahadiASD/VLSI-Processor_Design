@@ -1,0 +1,66 @@
+
+`timescale 1ns/10ps
+
+module tb_pc ();
+
+reg clk;
+reg a_reset_l;
+reg pc_write;
+reg [63:0] next_pc;
+wire [63:0] pc;
+
+integer errors = 0;
+
+//DUT instantiation
+pc pc_i(
+    .clk (clk),
+    .a_reset_l (a_reset_l),
+    .pc_write (pc_write),
+    .next_pc (next_pc),
+    .pc (pc)
+);
+
+//clock generation: 10ns period
+//initial clk= 1'b0;
+//always #5 clk = ~clk;
+
+//Helper task to check pc value
+
+task check_pc;
+    input [63:0] expected;
+    input [127:0] msg; //simple string label
+    begin
+        if (pc !== expected) begin
+            $display("FAIL [%0t ns] %0s: expected=0x%016h got=0x%016h",
+                     $time, msg, expected, pc);
+            errors = errors+1;
+        end else begin
+            $display("PASS [%0t ns] %0s: pc=0x%016h",
+                     $time, msg, pc);
+        end
+    end
+endtask
+
+/////////////////////////////////////////////
+// Template for clk and reset generation  //
+//// uncomment it when needed             //
+/////////////////////////////////////////////
+
+parameter CLKPERIOD = 100;
+
+initial clk = 1'b1;
+always #(CLKPERIOD/2.0) clk = !clk;
+
+initial begin
+    a_reset_l = 1'b0;
+    #33
+    a_reset_l = 1'b1;
+end
+
+/////////////////////////////////////////////
+
+// Template for testcase specific pattern generation
+// File has to be situated in simulation/<simulator_name>/[testcase] directory
+`include "testcase.v"
+
+endmodule
