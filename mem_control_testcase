@@ -1,0 +1,266 @@
+
+initial begin
+    mem_access = 1'b0;
+    mem_read = 1'b0;
+    mem_write = 1'b0;
+
+    mem_addr = 64'h0000000000000000;
+    store_data = 64'h0000000000000000;
+    byte_en = 8'h00;
+
+    sram_rdata = 64'h0000000000000000;
+    sram_ready = 1'b0;
+
+    ext_rdata = 64'h0000000000000000;
+    ext_ready = 1'b0;
+
+    #1;
+
+    //TEST 1: IDLE
+    mem_access = 1'b0;
+    mem_read = 1'b0;
+    mem_write = 1'b0;
+    #1;
+
+    check1(sram_req, 1'b0, "IDLE sram_req");
+    check1(ext_req, 1'b0, "IDLE ext_req");
+    check1(mem_ready, 1'b0, "IDLE mem_ready");
+    check1(mem_error, 1'b0, "IDLE mem_error");
+
+    //TEST 2: Internal SRAM read
+    mem_access = 1'b1;
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+    mem_addr = 64'h0000000000000100;
+    sram_rdata = 64'hCAFEBABEDEADBEEF;
+    sram_ready = 1'b1;
+
+    #1;
+    check1(sram_req, 1'b1, "SRAM read request");
+    check1(sram_we, 1'b0, "SRAM read write enable");
+    check12(sram_word_addr, 12'h020, "SRAM read word address");
+    check1(ext_req, 1'b0, "SRAM read external request");
+    check64(mem_rdata, 64'hCAFEBABEDEADBEEF, "SRAM read data");
+    check1(mem_ready, 1'b1, "SRAM read ready");
+    check1(mem_error, 1'b0, "SRAM read error");
+
+    //TEST 3: Internal SRAM write
+    mem_read = 1'b0;
+    mem_write = 1'b1;
+
+    mem_addr = 64'h0000000000007FF8;
+    store_data = 64'h1122334455667788;
+    byte_en = 8'hFF;
+
+    #1;
+    check1(sram_req, 1'b1, "SRAM write request");
+    check1(sram_we, 1'b1, "SRAM read write enable");
+
+    check12(sram_word_addr, 12'hFFF, "SRAM write word address");
+
+    check64(sram_wdata, 64'h1122334455667788, "SRAM write data");
+
+    check1(ext_req, 1'b0, "SRAM write external request");
+
+    //TEST 4: SRAM byte enabling forward
+    byte_en = 8'b00001111;
+
+    #1;
+
+    if (sram_byte_en !== 8'b00001111) begin
+        $display("FAIL SRAM byte enable: expected=0x0F got=0x%02h", sram_byte_en);
+        errors = errors+1;
+    end
+    else begin
+        $display("PASS SRAM byte enable: value=0x%02h", sram_byte_en);
+    end
+
+    //TEST 5: First external address
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+
+    mem_addr = 64'h0000000000008000;
+    ext_rdata = 64'hAAAABBBBCCCCDDDD;
+    ext_ready = 1'b1;
+
+    #1;
+    check1(sram_req, 1'b0, "External 0x08000 SRAM request");
+    check1(ext_req, 1'b1, "External 0x08000 request");
+    check1(ext_we, 1'b0, "External 0x08000 write enable");
+
+    check16(ext_addr, 17'h08000, "External 0x08000 address");
+
+    check64(mem_rdata, 64'hAAAABBBBCCCCDDDD, "External read data");
+
+    check1(mem_ready, 1'b1, "External read ready");
+
+    //TEST 6: Highest unaliased external address
+    mem_access = 1'b1;
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+    mem_addr = 64'h000000000001FFFF;
+
+    #1;
+
+    check1(ext_req, 1'b1, "External 0x1FFFF request");
+    check16(ext_addr, 17'h1FFFF, "External 0x1FFFF mapping");
+
+    //TEST 7: Beginning of alias region
+    mem_addr = 64'h0000000000020000;
+
+    #1;
+
+    check1(ext_req, 1'b1, "Alias 0x20000 external request");
+    check16(ext_addr, 17'h00000, "Alias 0x20000 mapping");
+
+    //TEST 8: Alias offset
+    mem_addr = 64'h0000000000020008;
+
+    #1;
+
+    check16(ext_addr, 17'h00008, "Alias 0x20008 request");
+
+    //TEST 9: Middle of alias region
+    mem_addr = 64'h0000000000030000;
+
+    #1;
+
+    check16(ext_addr, 17'h10000, "Alias 0x30000 mapping");
+
+    //TEST 10: Highest alias address
+    mem_addr = 64'h000000000003FFFF;
+
+    #1;
+
+    check16(ext_addr, 17'h1FFFF, "Alias 0x3FFFF mapping");
+
+    //TEST 11: External write
+    mem_read = 1'b0;
+    mem_write = 1'b1;
+
+    mem_addr = 64'h0000000000010000;
+    store_data = 64'h0123456789ABCDEF;
+    byte_en = 8'b01010101;
+
+    #1;
+    check1(ext_req, 1'b1, "External write request");
+    check1(ext_we, 1'b1, "External write enable");
+
+    check16(ext_addr, 17'h10000, "External write address");
+
+    check64(ext_wdata, 64'h0123456789ABCDEF, "External write data");
+
+    if (ext_byte_en !== 8'b01010101) begin
+        $display("FAIL External byte enable: expected=0xAA got=0x%02h", ext_byte_en);
+        errors = errors+1;
+    end
+    else begin
+        $display("PASS External byte enable: value=0x%02h", ext_byte_en);
+    end
+
+    //TEST 12: SRAM not ready
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+    mem_addr = 64'h0000000000000100;
+
+    sram_ready = 1'b0;
+
+    #1;
+    check1(sram_req, 1'b1, "SRAM wait request");
+    check1(mem_ready, 1'b0, "SRAM not ready");
+
+    //SRAM becomes ready
+    sram_ready = 1'b1;
+
+    #1;
+    check1(mem_ready, 1'b1, "SRAM becomes ready");
+
+    //TEST 13: External memory not ready
+    mem_addr = 64'h0000000000008000;
+
+    ext_ready = 1'b0;
+
+    #1;
+    check1(ext_req, 1'b1, "External wait request");
+    check1(mem_ready, 1'b0, "External not ready");
+
+    //External target becomes ready
+    ext_ready = 1'b1;
+
+    #1;
+
+    check1(mem_ready, 1'b1, "External becomes ready");
+
+    //TEST 14: Illegal simultaneous read+write
+    mem_addr = 64'h0000000000000100;
+
+    mem_read = 1'b1;
+    mem_write = 1'b1;
+
+    #1;
+    check1(mem_error, 1'b1, "Read/write conflict error");
+
+    check1(sram_req, 1'b0, "Conflict SRAM request");
+    check1(ext_req, 1'b0, "Conflict external request");
+    check1(mem_ready, 1'b0, "Conflict ready");
+
+    //TEST 15: Upper address bits ignored
+    mem_access = 1'b1;
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+
+    mem_addr = 64'hFFFFFFFFFF00100;
+
+    #1;
+
+    check1(sram_req, 1'b1, "Upper address bits ignored");
+    check1(ext_req, 1'b0, "Upper address bits do not affect routing");
+
+    check12(sram_word_addr, 12'h020, "Upper bits ignored SRAM address");
+
+    //TEST 16: Boundary check 0x07FFF
+    mem_access = 1'b1;
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+
+    mem_addr = 64'h0000000000007FFF;
+    #1;
+
+    check1(sram_req, 1'b1, "0x07FFF is internal");
+
+    check1(ext_req, 1'b0, "0x07FFF not external");
+
+    check12(sram_word_addr, 12'hFFF, "0x07FFF SRAM word address");
+
+    //TEST 17: Boundary check 0x08000
+    mem_addr = 64'h0000000000008000;
+    #1;
+
+    check1(sram_req, 1'b0, "0x08000 not internal");
+
+    check1(ext_req, 1'b1, "0x08000 is external");
+
+    check12(ext_addr, 17'h08000, "0x08000 external address");
+
+    //TEST 18: mem_access disabled
+    mem_access = 1'b0;
+    mem_read = 1'b1;
+    mem_write = 1'b0;
+    #1;
+
+    check1(sram_req, 1'b0, "Disabled access SRAM request");
+
+    check1(ext_req, 1'b0, "Disabled access external request");
+
+    check1(mem_ready, 1'b0, "Disabled access ready");
+
+    check1(mem_error, 1'b0, "Disabled access error");
+
+    //Summary
+    if (errors == 0)
+        $display("\n*** ALL MEM_CONTROL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d MEM_CONTROL TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
