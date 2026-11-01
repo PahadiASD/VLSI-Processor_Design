@@ -1,0 +1,114 @@
+
+`timescale 1ns/10ps
+
+module tb_csr_regs ();
+
+    reg clk;
+    reg a_reset_l;
+    reg [11:0] csr_addr;
+    reg [63:0] csr_wdata;
+    reg [1:0] csr_op;
+    reg csr_write_en;
+    wire [63:0] csr_rdata;
+
+    reg trap_mepc_we;
+    reg [63:0] trap_mepc;
+    reg trap_mcause_we;
+    reg [63:0] trap_mcause;
+
+    wire mstatus_mie;
+    wire [63:0] mepc_out;
+    wire [63:0] mcause_out;
+    wire csr_illegal;
+
+    localparam [11:0] CSR_MSTATUS = 12'h300;
+    localparam [11:0] CSR_MISA    = 12'h301;
+    localparam [11:0] CSR_MTVEC   = 12'h305;
+    localparam [11:0] CSR_MEPC    = 12'h341;
+    localparam [11:0] CSR_MCAUSE  = 12'h342;
+    localparam [11:0] CSR_UNKNOWN = 12'h7C0;
+
+    localparam [1:0] CSR_WRITE = 2'b00;
+    localparam [1:0] CSR_SET   = 2'b01;
+    localparam [1:0] CSR_CLEAR = 2'b10;
+
+    integer errors = 0;
+
+    csr_regs #(.ENABLE_C(1)) csr_regs_i (
+        .clk(clk),
+        .a_reset_l(a_reset_l),
+        .csr_addr(csr_addr),
+        .csr_wdata(csr_wdata),
+        .csr_op(csr_op),
+        .csr_write_en(csr_write_en),
+        .csr_rdata(csr_rdata),
+        .trap_mepc_we(trap_mepc_we),
+        .trap_mepc(trap_mepc),
+        .trap_mcause_we(trap_mcause_we),
+        .trap_mcause(trap_mcause),
+        .mstatus_mie(mstatus_mie),
+        .mcause_out(mcause_out),
+        .mepc_out(mepc_out),
+        .csr_illegal(csr_illegal)
+    );
+
+    initial clk = 1'b0;
+    always #5 clk = ~clk;
+
+    task check64;
+        input [63:0] actual;
+        input [63:0] expected;
+        input [127:0] msg;
+        begin
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=0x%016h got=0x%016h",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS %0s: value=0x%016h",
+                         msg, actual);
+            end
+        end
+    endtask
+
+    task check1;
+        input actual;
+        input expected;
+        input [127:0] msg;
+        begin
+            if (actual !== expected) begin
+                $display("FAIL %0s: expected=%0d got=%0d",
+                         msg, expected, actual);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS %0s: value=%0d",
+                         msg, actual);
+            end
+        end
+    endtask
+
+    /////////////////////////////////////////////
+    //// Template for clk and reset generation ///
+    //// uncomment it when needed             ///
+    /////////////////////////////////////////////
+
+    parameter CLKPERIOD = 100;
+
+    initial clk = 1'b0;
+    always #(CLKPERIOD/2.0) clk = !clk;
+
+    initial begin
+        a_reset_l = 1'b0;
+        #33
+        a_reset_l = 1'b1;
+    end
+
+    /////////////////////////////////////////////
+
+    // Template for testcase specific pattern generation
+    // File has to be situated in simulation/<simulator_name>/<testcase> directory
+    `include "testcase.v"
+
+endmodule
