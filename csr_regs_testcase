@@ -1,0 +1,250 @@
+
+initial begin
+
+    // Initial or default input values
+    csr_addr = 12'h000;
+    csr_wdata = 64'h0;
+    csr_op = CSR_WRITE;
+    csr_write_en = 1'b0;
+
+    trap_mepc_we = 1'b0;
+    trap_mepc = 64'h0;
+
+    trap_mcause_we = 1'b0;
+    trap_mcause = 64'h0;
+
+    // RESET TEST
+    a_reset_l = 1'b0;
+
+    #1;
+
+    check1(mstatus_mie, 1'b0, "reset:mstatus.MIE =0");
+    check64(mepc_out, 64'h0000000000000000, "reset: mepc=0");
+
+    // Keep reset active through a clock edge
+    @(posedge clk);
+    #1;
+
+    // Release reset
+    a_reset_l = 1'b1;
+    @(negedge clk);
+
+    // 2. Read MCAUSE after reset
+    csr_addr = CSR_MCAUSE;
+    #1;
+
+    check64(mepc_out, 64'h0000000000000000, "reset: mcause=0");
+
+    // 3. MSTATUS - SET MIE bit (bit 3)
+    csr_addr = CSR_MSTATUS;
+    csr_op = CSR_SET;
+    csr_wdata = 64'h0000000000000008;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check1(mstatus_mie, 1'b1, "mstatus SET bit3 -> MIE =1");
+
+    // 4. MEPC - normal WRITE
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'h00000000000000F0;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h00000000000000F0,
+            "mepc WRITE = 0xF0");
+
+    // 5. MEPC - CSR SET
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_SET;
+    csr_wdata = 64'h000000000000000F;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h00000000000000FF,
+            "mepc SET: 0xF0 | 0x0F = 0xFF");
+
+    // 6. MEPC - CSR CLEAR
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_CLEAR;
+    csr_wdata = 64'h00000000000000F0;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h000000000000000F,
+            "mepc CLEAR: 0xFF & ~0xF0 = 0x0F");
+
+    // 7. MEPC - full 64-bit write/readback
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'h0000000012345678;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h0000000012345678,
+            "mepc full 64-bit write/readback");
+
+    // 8. Hardware trap MEPC write has priority over software write
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'h00000000AAAAAAAA;
+    csr_write_en = 1'b1;
+
+    trap_mepc_we = 1'b1;
+    trap_mepc = 64'h00000000DEADBEEF;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+    trap_mepc_we = 1'b0;
+
+    check64(mepc_out, 64'h00000000DEADBEEF,
+            "mepc hardware trap write wins over software write");
+
+    // 9. Hardware MCAUSE write priority
+    csr_addr = CSR_MCAUSE;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'h0000000000000099;
+    csr_write_en = 1'b1;
+
+    trap_mcause_we = 1'b1;
+    trap_mcause = 64'h000000000000000B;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b1;
+    trap_mcause_we = 1'b1;
+
+    csr_addr = CSR_MCAUSE;
+
+    check64(mcause_out, 64'h000000000000000B,
+            "mcause hardware trap write wins");
+
+    // 10. MISA
+    csr_addr = CSR_MISA;
+
+    #1;
+
+    check64(csr_rdata, 64'h8000000000001104,
+            "misa RV64IMC constant value");
+
+    // Attempt illegal software write to MISA
+    csr_addr = CSR_MISA;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'hFFFFFFFFFFFFFFFF;
+    csr_write_en = 1'b1;
+
+    #1;
+
+    check1(csr_illegal, 1'b1,
+           "misa write attempt -> csr_illegal =1");
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    csr_addr = CSR_MISA;
+    #1;
+
+    check64(csr_rdata, 64'h8000000000001104,
+            "misa unchanged after illegal write");
+
+    // 11. MTVEC read only constant
+    csr_addr = CSR_MTVEC;
+
+    #1;
+
+    check64(csr_rdata, 64'h0000000000000001,
+            "mtvec constant value = 0x1");
+
+    // Attempt illegal software write to MTVEC
+    csr_addr = CSR_MTVEC;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'hDEADBEEFDEADBEEF;
+    csr_write_en = 1'b1;
+
+    #1;
+
+    check1(csr_illegal, 1'b1,
+           "mtvec write attempt -> csr_illegal =1");
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    csr_addr = CSR_MTVEC;
+    #1;
+
+    check64(csr_rdata, 64'h0000000000000001,
+            "mtvec unchanged after illegal write");
+
+    // 12. Unknown / unimplemented CSR
+    csr_addr = CSR_UNKNOWN;
+    csr_write_en = 1'b0;
+
+    #1;
+
+    check1(csr_illegal, 1'b1,
+           "unknown CSR address -> csr_illegal = 1");
+
+    // 13. csr_write_en = 0 must not modify MEPC
+    // First establish a known MEPC value
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_WRITE;
+    csr_wdata = 64'h0000000011112222;
+    csr_write_en = 1'b1;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h0000000011112222,
+            "mepc known value before write_en=0 test");
+
+    // Try to modify it while csr_write_en=0
+    csr_addr = CSR_MEPC;
+    csr_op = CSR_SET;
+    csr_wdata = 64'hFFFFFFFFFFFFFFFF;
+    csr_write_en = 1'b0;
+
+    @(posedge clk);
+    #1;
+
+    csr_write_en = 1'b0;
+
+    check64(mepc_out, 64'h0000000011112222,
+            "mepc unaffected when csr_write_en=0");
+
+    // Summary
+    if (errors == 0)
+        $display("\n*** ALL TESTS PASSED ***\n");
+    else
+        $display("\n*** %0d TEST(S) FAILED ***\n", errors);
+
+    $finish();
+end
